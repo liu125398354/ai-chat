@@ -314,22 +314,24 @@ function onKeydown(e) {
         <article
           v-for="msg in chat.messages"
           :key="msg.id"
-          class="bubble"
+          class="msg"
           :class="msg.role"
         >
+          <div class="bubble">
+            <div v-if="msg.role === 'user'" class="plain">{{ msg.content }}</div>
+            <MarkdownView
+              v-else
+              :source="msg.content"
+              :live="chat.generating && lastAssistant && lastAssistant.id === msg.id"
+            />
+            <div v-if="msg.status === 'failed'" class="fail-row">
+              <a-alert type="error" :message="chat.error || msg.errorCode || '生成失败'" show-icon />
+              <a-button size="small" :disabled="chat.generating" @click="onRetry">重试</a-button>
+            </div>
+          </div>
           <button type="button" class="copy-btn msg-copy" @click="copyMessage(msg)">
             {{ copiedId === msg.id ? '已复制' : '复制' }}
           </button>
-          <div v-if="msg.role === 'user'" class="plain">{{ msg.content }}</div>
-          <MarkdownView
-            v-else
-            :source="msg.content"
-            :live="chat.generating && lastAssistant && lastAssistant.id === msg.id"
-          />
-          <div v-if="msg.status === 'failed'" class="fail-row">
-            <a-alert type="error" :message="chat.error || msg.errorCode || '生成失败'" show-icon />
-            <a-button size="small" :disabled="chat.generating" @click="onRetry">重试</a-button>
-          </div>
         </article>
         <a-alert
           v-if="chat.error && lastAssistant?.status !== 'failed'"
@@ -415,39 +417,35 @@ function onKeydown(e) {
   border-color: #1f6f5b;
   color: #1f6f5b;
 }
-.bubble {
-  position: relative;
+.msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
   width: fit-content;
-  max-width: min(720px, 100%);
+  max-width: 100%;
   margin: 12px 0;
-  padding: 28px 14px 12px;
+}
+.msg.user {
+  margin-left: auto;
+}
+.bubble {
+  min-width: 0;
+  width: fit-content;
+  max-width: min(720px, calc(100% - 52px));
+  padding: 12px 14px;
   border-radius: 12px;
 }
-.msg-copy {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 0;
-  pointer-events: none;
-}
-.bubble:hover .msg-copy,
-.bubble:focus-within .msg-copy {
-  opacity: 1;
-  pointer-events: auto;
-}
-.bubble.user .msg-copy {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.35);
-  color: #fff;
-}
-.bubble.user {
-  margin-left: auto;
+.msg.user .bubble {
   background: #1f6f5b;
   color: #fff;
 }
-.bubble.assistant {
+.msg.assistant .bubble {
   background: #fffdf8;
   border: 1px solid #e4ddd0;
+}
+.msg-copy {
+  flex-shrink: 0;
+  margin-bottom: 2px;
 }
 .plain {
   white-space: pre-wrap;
