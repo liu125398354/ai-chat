@@ -2,7 +2,7 @@
 
 前后端分离的对话工作台：登录、多会话历史、服务端千帆流式（SSE）、Markdown 安全渲染。
 
-依据：`docs/PRD.md`、`docs/TECH.md`、`docs/API.md`、`docs/DATABASE.md`。
+依据：`docs/PRD.md`、`docs/TECH.md`、`docs/API.md`、`docs/DATABASE.md`、`docs/UI.md`。
 
 ## 仓库结构
 
@@ -10,7 +10,7 @@
 apps/web          Vue 3 + JavaScript + Vite（端口 8080，/api 反代到后端）
 apps/api          NestJS + TypeScript + Prisma（端口 3000）
 packages/shared   错误码与 SSE 事件名（纯 JS）
-docs/             PRD / TECH / API / DATABASE
+docs/             PRD / TECH / API / DATABASE / UI
 ```
 
 ## 环境
