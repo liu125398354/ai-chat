@@ -1,0 +1,28 @@
+/**
+ * @file base.css
+ * @author liunannan
+ * @date 2026-09-13
+ * @description 全局基础样式
+ */
+:root {
+  font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  color: #241f18;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}

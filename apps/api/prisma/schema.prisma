@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MessageRole {
+  user
+  assistant
+}
+
+enum MessageStatus {
+  completed
+  failed
+}
+
+model User {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username      String         @unique @db.VarChar(64)
+  passwordHash  String         @map("password_hash") @db.VarChar(255)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  conversations Conversation[]
+
+  @@map("users")
+}
+
+model Conversation {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  title     String    @default("新对话") @db.VarChar(200)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  messages  Message[]
+
+  @@index([userId, updatedAt(sort: Desc)], map: "conversations_user_id_updated_at_idx")
+  @@map("conversations")
+}
+
+model Message {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String         @map("conversation_id") @db.Uuid
+  role           MessageRole
+  content        String         @db.Text
+  status         MessageStatus  @default(completed)
+  errorCode      String?        @map("error_code") @db.VarChar(64)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  conversation   Conversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([conversationId, createdAt], map: "messages_conversation_id_created_at_idx")
+  @@map("messages")
+}
