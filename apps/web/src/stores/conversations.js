@@ -34,10 +34,10 @@ export const useConversationsStore = defineStore('conversations', () => {
     }
   }
 
+  /** 落库并插入侧栏；不选中，避免 watch 在首条发送前 load 冲掉乐观消息。 */
   async function create(title) {
     const created = await convApi.createConversation(title);
     items.value = [created, ...items.value.filter((row) => row.id !== created.id)];
-    currentId.value = created.id;
     return created;
   }
 

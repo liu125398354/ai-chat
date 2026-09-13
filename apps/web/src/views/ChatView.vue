@@ -74,6 +74,15 @@ watch(
     drawerOpen.value = false;
     if (!id) {
       chat.clear();
+      if (route.query.c) {
+        const query = { ...route.query };
+        delete query.c;
+        router.replace({ query });
+      }
+      return;
+    }
+    if (chat.generating && chat.streamConversationId === id) {
+      router.replace({ query: { ...route.query, c: id } });
       return;
     }
     await chat.load(id);
@@ -100,13 +109,10 @@ watch(
   },
 );
 
-/** 当前已是空会话则复用，避免侧栏堆出多条「新对话」。 */
-function canReuseEmptyCurrent() {
+/** 草稿新对话：无 currentId、无消息、未生成。 */
+function isDraftNewChat() {
   return Boolean(
-    conversations.currentId &&
-      !chat.loading &&
-      !chat.generating &&
-      chat.messages.length === 0,
+    !conversations.currentId && !chat.loading && !chat.generating && chat.messages.length === 0,
   );
 }
 
@@ -114,13 +120,9 @@ async function onNewChat() {
   draft.value = '';
   composerKey.value += 1;
   drawerOpen.value = false;
-  if (canReuseEmptyCurrent()) {
-    await nextTick();
-    composerRef.value?.focus?.();
-    return;
+  if (!isDraftNewChat()) {
+    conversations.select('');
   }
-  chat.clear();
-  await conversations.create();
   await nextTick();
   composerRef.value?.focus?.();
 }
@@ -184,7 +186,11 @@ async function onSend() {
   } else {
     conversations.touch(conversationId);
   }
-  await chat.send(conversationId, payload);
+  const sending = chat.send(conversationId, payload);
+  if (conversations.currentId !== conversationId) {
+    conversations.select(conversationId);
+  }
+  await sending;
 }
 
 async function onRetry() {
@@ -257,8 +263,11 @@ function onKeydown(e) {
       </a-layout-header>
       <div ref="messagesEl" class="messages">
         <a-skeleton v-if="chat.loading" active :paragraph="{ rows: 4 }" />
-        <a-empty v-else-if="emptyWorkbench" description="创建新对话，或直接在下方输入以开始。" />
-        <a-empty v-else-if="chat.messages.length === 0" description="这一轮还没有消息，在下方提问即可。" />
+        <a-empty v-else-if="emptyWorkbench" description="在下方输入以开始新对话。" />
+        <a-empty
+          v-else-if="chat.messages.length === 0"
+          :description="conversations.currentId ? '这一轮还没有消息，在下方提问即可。' : '输入消息开始新对话。'"
+        />
         <article
           v-for="msg in chat.messages"
           :key="msg.id"

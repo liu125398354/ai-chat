@@ -47,6 +47,9 @@ export const useChatStore = defineStore('chat', () => {
       if (generating.value && streamConversationId.value === conversationId) {
         return;
       }
+      if (useConversationsStore().currentId !== conversationId) {
+        return;
+      }
       messages.value = data.items || [];
     } catch (err) {
       error.value = err.response?.data?.message || err.message || '加载消息失败';
