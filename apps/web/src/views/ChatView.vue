@@ -417,7 +417,8 @@ function onKeydown(e) {
 }
 .bubble {
   position: relative;
-  max-width: 720px;
+  width: fit-content;
+  max-width: min(720px, 100%);
   margin: 12px 0;
   padding: 28px 14px 12px;
   border-radius: 12px;
