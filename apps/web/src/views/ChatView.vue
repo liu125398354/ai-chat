@@ -100,11 +100,29 @@ watch(
   },
 );
 
+/** 当前已是空会话则复用，避免侧栏堆出多条「新对话」。 */
+function canReuseEmptyCurrent() {
+  return Boolean(
+    conversations.currentId &&
+      !chat.loading &&
+      !chat.generating &&
+      chat.messages.length === 0,
+  );
+}
+
 async function onNewChat() {
-  chat.clear();
   draft.value = '';
   composerKey.value += 1;
+  drawerOpen.value = false;
+  if (canReuseEmptyCurrent()) {
+    await nextTick();
+    composerRef.value?.focus?.();
+    return;
+  }
+  chat.clear();
   await conversations.create();
+  await nextTick();
+  composerRef.value?.focus?.();
 }
 
 function onSelect(id) {
