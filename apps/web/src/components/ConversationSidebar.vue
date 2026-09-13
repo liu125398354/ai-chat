@@ -3,11 +3,10 @@
   @author liunannan
   @date 2026-09-13
   @updated 2026-09-13
-  @description 会话列表：悬停才出现重命名/删除，点击铅笔重命名
+  @description 会话列表：⋯ 菜单提供重命名与删除，未悬停不显示操作
 -->
 <script setup>
 import { nextTick, ref } from 'vue';
-import { DeleteOutlined, EditOutlined } from '@ant-design/icons-vue';
 
 defineProps({
   items: { type: Array, default: () => [] },
@@ -21,22 +20,15 @@ const emit = defineEmits(['new', 'select', 'delete', 'rename', 'logout', 'change
 
 const editingId = ref('');
 const editingTitle = ref('');
-const hoveredId = ref('');
 const renameInput = ref(null);
-
-function onEnterRow(id) {
-  hoveredId.value = id;
-}
-
-function onLeaveRow() {
-  hoveredId.value = '';
-}
+const menuOpenId = ref('');
 
 function setRenameEl(el) {
   renameInput.value = el;
 }
 
 function startRename(item) {
+  menuOpenId.value = '';
   editingId.value = item.id;
   editingTitle.value = item.title;
   nextTick(() => {
@@ -68,8 +60,17 @@ function onRenameKeydown(e, item) {
   }
 }
 
-function showActions(itemId) {
-  return hoveredId.value === itemId && editingId.value !== itemId;
+function onOpenChange(open, id) {
+  menuOpenId.value = open ? id : '';
+}
+
+function onMenuClick({ key }, item) {
+  if (key === 'rename') {
+    startRename(item);
+  }
+  if (key === 'delete') {
+    emit('delete', item.id);
+  }
 }
 </script>
 
@@ -86,9 +87,7 @@ function showActions(itemId) {
       <li
         v-for="item in items"
         :key="item.id"
-        :class="{ active: item.id === currentId }"
-        @mouseenter="onEnterRow(item.id)"
-        @mouseleave="onLeaveRow"
+        :class="{ active: item.id === currentId, 'menu-open': menuOpenId === item.id }"
       >
         <input
           v-if="editingId === item.id"
@@ -109,24 +108,22 @@ function showActions(itemId) {
         >
           {{ item.title }}
         </button>
-        <div v-if="showActions(item.id)" class="conv-actions">
-          <button
-            type="button"
-            class="icon-btn"
-            title="重命名"
-            @click.stop="startRename(item)"
-          >
-            <EditOutlined />
+        <a-dropdown
+          v-if="editingId !== item.id"
+          :open="menuOpenId === item.id"
+          :trigger="['click']"
+          @openChange="(open) => onOpenChange(open, item.id)"
+        >
+          <button type="button" class="more-btn" title="更多" @click.stop>
+            ⋯
           </button>
-          <button
-            type="button"
-            class="icon-btn danger"
-            title="删除"
-            @click.stop="$emit('delete', item.id)"
-          >
-            <DeleteOutlined />
-          </button>
-        </div>
+          <template #overlay>
+            <a-menu @click="onMenuClick($event, item)">
+              <a-menu-item key="rename">重命名</a-menu-item>
+              <a-menu-item key="delete">删除</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
       </li>
     </ul>
     <div class="side-foot">
@@ -175,7 +172,6 @@ function showActions(itemId) {
   min-height: 0;
 }
 .conv-list li {
-  position: relative;
   display: flex;
   gap: 4px;
   margin-bottom: 6px;
@@ -202,37 +198,29 @@ function showActions(itemId) {
 .conv-btn:hover {
   background: #32443c;
 }
-.conv-actions {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 2px;
-  padding-left: 16px;
-  background: linear-gradient(to right, transparent, #243028 14px);
-}
-.conv-list li.active .conv-actions {
-  background: linear-gradient(to right, transparent, #3a5248 14px);
-}
-.icon-btn {
+.more-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
   border: 0;
+  border-radius: 6px;
   background: transparent;
-  color: #c5d5cc;
+  color: #e7eee9;
+  font-size: 18px;
+  line-height: 1;
   cursor: pointer;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
-.icon-btn:hover {
+.conv-list li:hover .more-btn,
+.conv-list li.menu-open .more-btn {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.more-btn:hover {
   background: #1c2622;
-  color: #fff;
-}
-.icon-btn.danger:hover {
-  color: #ff7875;
 }
 .rename-input {
   flex: 1;

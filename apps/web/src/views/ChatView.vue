@@ -146,40 +146,32 @@ async function onSend() {
     sendError.value = '单条消息最多 8000 字';
     return;
   }
-  clearComposer();
+  const payload = text;
+  draft.value = '';
+  composerKey.value += 1;
   let conversationId = conversations.currentId;
   if (!conversationId) {
     try {
       const created = await conversations.create();
       conversationId = created.id;
     } catch (err) {
-      draft.value = text;
+      draft.value = payload;
       sendError.value = err.response?.data?.message || '创建会话失败';
       antdMessage.error(sendError.value);
       return;
     }
   }
   if (conversations.isDefaultTitle(conversationId)) {
-    conversations.touch(conversationId, titleFromUserContent(text));
+    conversations.touch(conversationId, titleFromUserContent(payload));
   } else {
     conversations.touch(conversationId);
   }
-  await chat.send(conversationId, text);
+  await chat.send(conversationId, payload);
 }
 
 async function onRetry() {
   if (!conversations.currentId || chat.generating) return;
   await chat.retryLastFailed(conversations.currentId);
-}
-
-/** 立刻清掉输入框（含原生节点），避免组件把原文写回。 */
-function clearComposer() {
-  draft.value = '';
-  const el = composerRef.value;
-  if (el) {
-    el.value = '';
-    el.dispatchEvent(new Event('input'));
-  }
 }
 
 function onKeydown(e) {
@@ -283,7 +275,6 @@ function onKeydown(e) {
           rows="3"
           maxlength="8000"
           placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-          :disabled="chat.generating"
           @keydown="onKeydown"
         />
         <a-button type="primary" :disabled="chat.generating || !draft.trim()" @click="onSend">
