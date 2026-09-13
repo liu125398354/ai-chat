@@ -2,12 +2,17 @@
   @file ChatView.vue
   @author liunannan
   @date 2026-09-13
-  @description 工作台：左会话列表 / 中消息 / 底输入
+  @updated 2026-09-13
+  @description 工作台：固定侧栏滚动列表 + 消息区内滚动 + 流式展示
 -->
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { MenuOutlined } from '@ant-design/icons-vue';
+import { message as antdMessage, Modal } from 'ant-design-vue';
 import MarkdownView from '@/components/MarkdownView.vue';
+import ChangePasswordModal from '@/components/ChangePasswordModal.vue';
+import ConversationSidebar from '@/components/ConversationSidebar.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
 import { useConversationsStore } from '@/stores/conversations';
@@ -20,6 +25,10 @@ const route = useRoute();
 const draft = ref('');
 const messagesEl = ref(null);
 const sendError = ref('');
+const passwordOpen = ref(false);
+const drawerOpen = ref(false);
+const isMobile = ref(false);
+let media = null;
 
 const emptyWorkbench = computed(
   () => !conversations.currentId && !conversations.loading && conversations.items.length === 0,
@@ -30,7 +39,19 @@ const lastAssistant = computed(() => {
   return list.length ? list[list.length - 1] : null;
 });
 
+const streamText = computed(() => lastAssistant.value?.content || '');
+
+function syncViewport() {
+  isMobile.value = media.matches;
+  if (!media.matches) {
+    drawerOpen.value = false;
+  }
+}
+
 onMounted(async () => {
+  media = window.matchMedia('(max-width: 768px)');
+  syncViewport();
+  media.addEventListener('change', syncViewport);
   await conversations.fetchList();
   const fromQuery = typeof route.query.c === 'string' ? route.query.c : '';
   const nextId = fromQuery || conversations.items[0]?.id || '';
@@ -39,10 +60,15 @@ onMounted(async () => {
   }
 });
 
+onUnmounted(() => {
+  media?.removeEventListener('change', syncViewport);
+});
+
 watch(
   () => conversations.currentId,
   async (id, prev) => {
     if (id === prev) return;
+    drawerOpen.value = false;
     if (!id) {
       chat.clear();
       return;
@@ -62,7 +88,7 @@ watch(
 );
 
 watch(
-  () => chat.messages.length,
+  () => [chat.messages.length, streamText.value],
   async () => {
     await nextTick();
     if (messagesEl.value) {
@@ -80,8 +106,16 @@ async function onSelect(id) {
 }
 
 async function onDelete(id) {
-  if (!window.confirm('删除该会话后不可恢复，确认删除？')) return;
-  await conversations.remove(id);
+  Modal.confirm({
+    title: '删除会话',
+    content: '删除该会话后不可恢复，确认删除？',
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      await conversations.remove(id);
+    },
+  });
 }
 
 async function onLogout() {
@@ -105,6 +139,7 @@ async function onSend() {
       conversationId = created.id;
     } catch (err) {
       sendError.value = err.response?.data?.message || '创建会话失败';
+      antdMessage.error(sendError.value);
       return;
     }
   }
@@ -126,47 +161,60 @@ function onKeydown(e) {
 </script>
 
 <template>
-  <div class="workbench">
-    <aside class="sidebar">
-      <div class="side-head">
-        <strong>会话</strong>
-        <button type="button" class="ghost" @click="onNewChat">新对话</button>
-      </div>
-      <div v-if="conversations.loading" class="skel-list" aria-hidden="true">
-        <div class="skel" />
-        <div class="skel" />
-        <div class="skel" />
-      </div>
-      <p v-else-if="conversations.error" class="err">{{ conversations.error }}</p>
-      <p v-else-if="conversations.items.length === 0" class="muted">还没有会话</p>
-      <ul v-else class="conv-list">
-        <li
-          v-for="item in conversations.items"
-          :key="item.id"
-          :class="{ active: item.id === conversations.currentId }"
-        >
-          <button type="button" class="conv-btn" @click="onSelect(item.id)">
-            {{ item.title }}
-          </button>
-          <button type="button" class="danger" @click="onDelete(item.id)">删</button>
-        </li>
-      </ul>
-      <div class="side-foot">
-        <span>{{ auth.user?.username }}</span>
-        <button type="button" class="ghost" @click="onLogout">退出</button>
-      </div>
-    </aside>
+  <a-layout class="workbench">
+    <a-layout-sider
+      v-if="!isMobile"
+      :width="280"
+      theme="dark"
+      class="sidebar"
+    >
+      <ConversationSidebar
+        :items="conversations.items"
+        :current-id="conversations.currentId"
+        :loading="conversations.loading"
+        :error="conversations.error"
+        :username="auth.user?.username"
+        @new="onNewChat"
+        @select="onSelect"
+        @delete="onDelete"
+        @logout="onLogout"
+        @change-password="passwordOpen = true"
+      />
+    </a-layout-sider>
 
-    <section class="main">
+    <a-drawer
+      v-if="isMobile"
+      v-model:open="drawerOpen"
+      title="会话"
+      placement="left"
+      :width="280"
+      :body-style="{ padding: 0, height: 'calc(100% - 55px)', background: '#243028' }"
+    >
+      <ConversationSidebar
+        :items="conversations.items"
+        :current-id="conversations.currentId"
+        :loading="conversations.loading"
+        :error="conversations.error"
+        :username="auth.user?.username"
+        @new="onNewChat"
+        @select="onSelect"
+        @delete="onDelete"
+        @logout="onLogout"
+        @change-password="passwordOpen = true"
+      />
+    </a-drawer>
+
+    <a-layout class="main">
+      <a-layout-header v-if="isMobile" class="mobile-bar">
+        <a-button type="text" @click="drawerOpen = true">
+          <MenuOutlined />
+        </a-button>
+        <span>AI Chat</span>
+      </a-layout-header>
       <div ref="messagesEl" class="messages">
-        <div v-if="chat.loading" class="skel-msg" aria-hidden="true">
-          <div class="skel wide" />
-          <div class="skel" />
-        </div>
-        <p v-else-if="emptyWorkbench" class="welcome">创建新对话，或直接在下方输入以开始。</p>
-        <p v-else-if="chat.messages.length === 0" class="welcome">
-          这一轮还没有消息，在下方提问即可。
-        </p>
+        <a-skeleton v-if="chat.loading" active :paragraph="{ rows: 4 }" />
+        <a-empty v-else-if="emptyWorkbench" description="创建新对话，或直接在下方输入以开始。" />
+        <a-empty v-else-if="chat.messages.length === 0" description="这一轮还没有消息，在下方提问即可。" />
         <article
           v-for="msg in chat.messages"
           :key="msg.id"
@@ -179,111 +227,74 @@ function onKeydown(e) {
             :source="msg.content"
             :live="chat.generating && lastAssistant && lastAssistant.id === msg.id"
           />
-          <p v-if="chat.generating && lastAssistant && lastAssistant.id === msg.id && !msg.content" class="muted">
-            生成中…
-          </p>
           <div v-if="msg.status === 'failed'" class="fail-row">
-            <p class="err">{{ chat.error || msg.errorCode || '生成失败' }}</p>
-            <button type="button" class="retry" :disabled="chat.generating" @click="onRetry">
-              重试
-            </button>
+            <a-alert type="error" :message="chat.error || msg.errorCode || '生成失败'" show-icon />
+            <a-button size="small" :disabled="chat.generating" @click="onRetry">重试</a-button>
           </div>
         </article>
-        <p v-if="chat.error && lastAssistant?.status !== 'failed'" class="err">{{ chat.error }}</p>
-        <p v-if="sendError" class="err">{{ sendError }}</p>
+        <a-alert
+          v-if="chat.error && lastAssistant?.status !== 'failed'"
+          type="error"
+          :message="chat.error"
+          show-icon
+          class="alert-gap"
+        />
+        <a-alert v-if="sendError" type="error" :message="sendError" show-icon class="alert-gap" />
       </div>
-      <form class="composer" @submit.prevent="onSend">
-        <textarea
-          v-model="draft"
-          rows="3"
-          maxlength="8000"
+      <div class="composer">
+        <a-textarea
+          v-model:value="draft"
+          :rows="3"
+          :maxlength="8000"
           placeholder="输入消息，Enter 发送，Shift+Enter 换行"
           :disabled="chat.generating"
           @keydown="onKeydown"
         />
-        <button type="submit" :disabled="chat.generating || !draft.trim()">
-          {{ chat.generating ? '生成中…' : '发送' }}
-        </button>
-      </form>
-    </section>
-  </div>
+        <a-button type="primary" :disabled="chat.generating || !draft.trim()" @click="onSend">
+          发送
+        </a-button>
+      </div>
+    </a-layout>
+  </a-layout>
+  <ChangePasswordModal v-model:open="passwordOpen" />
 </template>
 
 <style scoped>
 .workbench {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  height: 100vh;
-  background: #f6f1e8;
+  height: 100%;
+  overflow: hidden;
 }
 .sidebar {
-  display: flex;
-  flex-direction: column;
-  background: #243028;
-  color: #e7eee9;
-  padding: 16px 12px;
+  background: #243028 !important;
+  overflow: hidden;
 }
-.side-head,
-.side-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.side-foot {
-  margin-top: auto;
-  padding-top: 12px;
-  font-size: 13px;
-}
-.conv-list {
-  list-style: none;
-  margin: 16px 0;
-  padding: 0;
-  overflow: auto;
-  flex: 1;
-}
-.conv-list li {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-.conv-list li.active .conv-btn {
-  background: #3a5248;
-}
-.conv-btn {
-  flex: 1;
-  text-align: left;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-.ghost,
-.danger {
-  border: 0;
-  background: transparent;
-  color: #b7cfc3;
-  cursor: pointer;
-  font-size: 13px;
-}
-.danger {
-  color: #e8b4b4;
+.sidebar :deep(.ant-layout-sider-children) {
+  height: 100%;
+  overflow: hidden;
 }
 .main {
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  background: #f6f1e8;
+  overflow: hidden;
+}
+.mobile-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 8px;
+  background: #fffdf8;
+  line-height: 48px;
+  flex-shrink: 0;
 }
 .messages {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 24px 32px;
-}
-.welcome,
-.muted {
-  color: #6b6458;
 }
 .bubble {
   max-width: 720px;
@@ -306,73 +317,23 @@ function onKeydown(e) {
 }
 .composer {
   display: flex;
+  align-items: flex-end;
   gap: 12px;
   padding: 16px 32px 24px;
   border-top: 1px solid #e4ddd0;
   background: #fffdf8;
+  flex-shrink: 0;
 }
-textarea {
+.composer :deep(.ant-input-textarea) {
   flex: 1;
-  resize: none;
-  padding: 10px 12px;
-  border: 1px solid #d9d1c3;
-  border-radius: 10px;
-  font: inherit;
-}
-.composer button {
-  align-self: flex-end;
-  padding: 10px 16px;
-  border: 0;
-  border-radius: 8px;
-  background: #1f6f5b;
-  color: #fff;
-  cursor: pointer;
-}
-.composer button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.err {
-  color: #b42318;
-  font-size: 13px;
-}
-.skel-list,
-.skel-msg {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 16px 0;
-}
-.skel {
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #2c3a34, #3a5248, #2c3a34);
-  background-size: 200% 100%;
-  animation: shimmer 1.2s ease-in-out infinite;
-}
-.skel-msg .skel {
-  background: linear-gradient(90deg, #efe8dc, #f7f2ea, #efe8dc);
-  background-size: 200% 100%;
-  height: 48px;
-}
-.skel-msg .skel.wide {
-  width: 70%;
 }
 .fail-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 8px;
 }
-.retry {
-  border: 1px solid #d9d1c3;
-  background: #fff;
-  border-radius: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-@keyframes shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
+.alert-gap {
+  margin-top: 12px;
 }
 </style>

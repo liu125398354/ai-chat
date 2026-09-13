@@ -2,7 +2,8 @@
   @file MarkdownView.vue
   @author liunannan
   @date 2026-09-13
-  @description 助手 Markdown：markdown-it → DOMPurify；流式节流 64ms，done 后完整渲染
+  @updated 2026-09-13
+  @description 助手 Markdown：markdown-it → DOMPurify；流式用 rAF 贴合 delta
 -->
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -40,30 +41,32 @@ const md = new MarkdownIt({
 });
 
 const displaySource = ref(props.source);
-let timer = null;
+let raf = 0;
+
+function paint() {
+  displaySource.value = props.source;
+  raf = 0;
+}
 
 watch(
   () => [props.source, props.live],
   () => {
     if (!props.live) {
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
       }
       displaySource.value = props.source;
       return;
     }
-    if (timer) return;
-    timer = setTimeout(() => {
-      displaySource.value = props.source;
-      timer = null;
-    }, 64);
+    if (raf) return;
+    raf = requestAnimationFrame(paint);
   },
   { immediate: true },
 );
 
 onBeforeUnmount(() => {
-  if (timer) clearTimeout(timer);
+  if (raf) cancelAnimationFrame(raf);
 });
 
 const html = computed(() =>
@@ -76,10 +79,16 @@ const html = computed(() =>
 </script>
 
 <template>
-  <div class="md-body" v-html="html" />
+  <div class="md-wrap">
+    <div class="md-body" v-html="html" />
+    <span v-if="live" class="caret" aria-hidden="true" />
+  </div>
 </template>
 
 <style scoped>
+.md-wrap {
+  position: relative;
+}
 .md-body :deep(pre) {
   overflow: auto;
   padding: 12px;
@@ -98,5 +107,17 @@ const html = computed(() =>
 .md-body :deep(ul),
 .md-body :deep(ol) {
   padding-left: 1.2em;
+}
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 2px;
+  background: #1f6f5b;
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+}
+@keyframes blink {
+  50% { opacity: 0; }
 }
 </style>

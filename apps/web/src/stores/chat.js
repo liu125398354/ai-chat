@@ -95,8 +95,12 @@ export const useChatStore = defineStore('chat', () => {
           if (event === 'meta' && data.userMessageId) {
             tempUser.id = data.userMessageId;
           }
-          if (event === 'delta' && data.content) {
+          if (event === 'delta' && typeof data.content === 'string' && data.content) {
             tempAsst.content += data.content;
+            const idx = messages.value.findIndex((row) => row.id === tempAsst.id);
+            if (idx >= 0) {
+              messages.value[idx] = { ...messages.value[idx], content: tempAsst.content };
+            }
           }
           if (event === 'done' && data.messageId) {
             tempAsst.id = data.messageId;

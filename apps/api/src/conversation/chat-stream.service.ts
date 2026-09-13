@@ -200,5 +200,7 @@ export class ChatStreamService {
     }
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
+    const flushable = res as Response & { flush?: () => void };
+    flushable.flush?.();
   }
 }

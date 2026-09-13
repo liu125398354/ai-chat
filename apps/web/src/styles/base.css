@@ -2,7 +2,8 @@
  * @file base.css
  * @author liunannan
  * @date 2026-09-13
- * @description 全局基础样式
+ * @updated 2026-09-13
+ * @description 全局基础样式；工作台高度锁在视口内滚动
  */
 :root {
   font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
@@ -19,6 +20,7 @@ body,
 #app {
   margin: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 button,

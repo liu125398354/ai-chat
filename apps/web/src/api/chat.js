@@ -49,22 +49,34 @@ export async function streamMessages(conversationId, body, signal, onEvent) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split('\n\n');
-    buffer = parts.pop() || '';
-    for (const part of parts) {
-      const parsed = parseSseBlock(part);
-      if (parsed) onEvent(parsed.event, parsed.data);
-    }
+    buffer = consumeSse(buffer, onEvent);
   }
-  const tail = parseSseBlock(buffer);
-  if (tail) onEvent(tail.event, tail.data);
+  buffer += decoder.decode();
+  consumeSse(buffer, onEvent, true);
+}
+
+/**
+ * 按空行切分 SSE 块并回调；兼容 LF / CRLF。
+ * @param {string} buffer
+ * @param {(event: string, data: object) => void} onEvent
+ * @param {boolean} [flushTail]
+ */
+function consumeSse(buffer, onEvent, flushTail = false) {
+  const parts = buffer.split(/\r?\n\r?\n/);
+  const rest = flushTail ? '' : parts.pop() || '';
+  const blocks = flushTail ? (buffer.trim() ? [buffer] : []) : parts;
+  for (const part of blocks) {
+    const parsed = parseSseBlock(part);
+    if (parsed) onEvent(parsed.event, parsed.data);
+  }
+  return rest;
 }
 
 /** @param {string} block */
 function parseSseBlock(block) {
   let event = 'message';
   const dataLines = [];
-  for (const line of block.split('\n')) {
+  for (const line of block.split(/\r?\n/)) {
     if (line.startsWith('event:')) {
       event = line.slice(6).trim();
     } else if (line.startsWith('data:')) {

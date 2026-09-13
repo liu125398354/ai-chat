@@ -24,6 +24,15 @@ export default defineConfig({
         timeout: 125000,
         proxyTimeout: 125000,
         rewrite: (path) => path.replace(/^\/api/, ''),
+        configure(proxy) {
+          proxy.on('proxyRes', (proxyRes, _req, res) => {
+            const ct = String(proxyRes.headers['content-type'] || '');
+            if (ct.includes('text/event-stream')) {
+              res.setHeader('Cache-Control', 'no-cache, no-transform');
+              res.setHeader('X-Accel-Buffering', 'no');
+            }
+          });
+        },
       },
     },
   },

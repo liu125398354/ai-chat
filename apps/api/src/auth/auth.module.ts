@@ -11,6 +11,7 @@ import { loadAppEnv } from '../config/env';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { PasswordCryptoService } from './password-crypto.service';
 
 const env = loadAppEnv();
 
@@ -23,7 +24,7 @@ const env = loadAppEnv();
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, PasswordCryptoService],
   exports: [AuthService],
 })
 export class AuthModule {}
