@@ -10,7 +10,7 @@
 apps/web          Vue 3 + JavaScript + Vite（端口 8080，/api 反代到后端）
 apps/api          NestJS + TypeScript + Prisma（端口 3000）
 packages/shared   错误码与 SSE 事件名（纯 JS）
-docs/             PRD / TECH / API / DATABASE / UI
+docs/             PRD / TECH / API / DATABASE / UI（含 ui-preview.html 效果图）
 ```
 
 ## 环境
@@ -34,6 +34,8 @@ npm run dev:web
 浏览器打开 `http://localhost:8080`。登录页请求走 `/api/v1/...` → `http://localhost:3000/v1/...`。
 
 后端 **REST 接口文档页**：`http://localhost:3000/docs`（Swagger UI，可 Authorize 后试调 JSON 接口）。机器可读规范：`http://localhost:3000/docs-json`。流式 SSE 请用 fetch，对照 `docs/API.md`。
+
+界面设计见 `docs/UI.md`。静态效果图：用浏览器打开 `docs/ui-preview.html`。
 
 ## 里程碑
 
