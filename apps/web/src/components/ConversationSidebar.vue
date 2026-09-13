@@ -22,6 +22,7 @@ const editingId = ref('');
 const editingTitle = ref('');
 const renameInput = ref(null);
 const menuOpenId = ref('');
+const confirmingId = ref('');
 
 function setRenameEl(el) {
   renameInput.value = el;
@@ -61,7 +62,16 @@ function onRenameKeydown(e, item) {
 }
 
 function onOpenChange(open, id) {
+  if (confirmingId.value === id && open) {
+    return;
+  }
   menuOpenId.value = open ? id : '';
+}
+
+function onRowLeave(id) {
+  if (confirmingId.value === id) {
+    confirmingId.value = '';
+  }
 }
 
 function onMenuClick({ key }, item) {
@@ -69,6 +79,8 @@ function onMenuClick({ key }, item) {
     startRename(item);
   }
   if (key === 'delete') {
+    menuOpenId.value = '';
+    confirmingId.value = item.id;
     emit('delete', item.id);
   }
 }
@@ -83,11 +95,16 @@ function onMenuClick({ key }, item) {
     <a-skeleton v-if="loading" active :title="false" :paragraph="{ rows: 6 }" />
     <a-alert v-else-if="error" type="error" :message="error" show-icon />
     <a-empty v-else-if="items.length === 0" description="还没有会话" />
-    <ul v-else class="conv-list">
+    <ul v-else class="conv-list thin-scroll thin-scroll-dark">
       <li
         v-for="item in items"
         :key="item.id"
-        :class="{ active: item.id === currentId, 'menu-open': menuOpenId === item.id }"
+        :class="{
+          active: item.id === currentId,
+          'menu-open': menuOpenId === item.id,
+          confirming: confirmingId === item.id,
+        }"
+        @mouseleave="onRowLeave(item.id)"
       >
         <input
           v-if="editingId === item.id"
@@ -213,7 +230,7 @@ function onMenuClick({ key }, item) {
   visibility: hidden;
   pointer-events: none;
 }
-.conv-list li:hover .more-btn,
+.conv-list li:hover:not(.confirming) .more-btn,
 .conv-list li.menu-open .more-btn {
   opacity: 1;
   visibility: visible;

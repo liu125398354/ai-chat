@@ -140,12 +140,14 @@ async function onRename(id, title) {
 }
 
 async function onDelete(id) {
+  await nextTick();
   Modal.confirm({
     title: '删除会话',
     content: '删除该会话后不可恢复，确认删除？',
     okText: '删除',
     okType: 'danger',
     cancelText: '取消',
+    zIndex: 2000,
     async onOk() {
       await conversations.remove(id);
     },
@@ -261,7 +263,7 @@ function onKeydown(e) {
         </a-button>
         <span>AI Chat</span>
       </a-layout-header>
-      <div ref="messagesEl" class="messages">
+      <div ref="messagesEl" class="messages thin-scroll">
         <a-skeleton v-if="chat.loading" active :paragraph="{ rows: 4 }" />
         <a-empty v-else-if="emptyWorkbench" description="在下方输入以开始新对话。" />
         <a-empty
