@@ -3,11 +3,11 @@
   @author liunannan
   @date 2026-09-13
   @updated 2026-09-13
-  @description 会话列表：提问摘要标题、悬停删除、双击重命名
+  @description 会话列表：悬停才出现重命名/删除，点击铅笔重命名
 -->
 <script setup>
 import { nextTick, ref } from 'vue';
-import { DeleteOutlined } from '@ant-design/icons-vue';
+import { DeleteOutlined, EditOutlined } from '@ant-design/icons-vue';
 
 defineProps({
   items: { type: Array, default: () => [] },
@@ -21,13 +21,27 @@ const emit = defineEmits(['new', 'select', 'delete', 'rename', 'logout', 'change
 
 const editingId = ref('');
 const editingTitle = ref('');
+const hoveredId = ref('');
 const renameInput = ref(null);
+
+function onEnterRow(id) {
+  hoveredId.value = id;
+}
+
+function onLeaveRow() {
+  hoveredId.value = '';
+}
+
+function setRenameEl(el) {
+  renameInput.value = el;
+}
 
 function startRename(item) {
   editingId.value = item.id;
   editingTitle.value = item.title;
   nextTick(() => {
     renameInput.value?.focus?.();
+    renameInput.value?.select?.();
   });
 }
 
@@ -53,6 +67,10 @@ function onRenameKeydown(e, item) {
     cancelRename();
   }
 }
+
+function showActions(itemId) {
+  return hoveredId.value === itemId && editingId.value !== itemId;
+}
 </script>
 
 <template>
@@ -69,12 +87,14 @@ function onRenameKeydown(e, item) {
         v-for="item in items"
         :key="item.id"
         :class="{ active: item.id === currentId }"
+        @mouseenter="onEnterRow(item.id)"
+        @mouseleave="onLeaveRow"
       >
-        <a-input
+        <input
           v-if="editingId === item.id"
-          ref="renameInput"
-          v-model:value="editingTitle"
-          size="small"
+          :ref="setRenameEl"
+          v-model="editingTitle"
+          class="rename-input"
           maxlength="200"
           @blur="commitRename(item)"
           @keydown="onRenameKeydown($event, item)"
@@ -86,21 +106,27 @@ function onRenameKeydown(e, item) {
           class="conv-btn"
           :title="item.title"
           @click="$emit('select', item.id)"
-          @dblclick.stop="startRename(item)"
         >
           {{ item.title }}
         </button>
-        <a-button
-          v-if="editingId !== item.id"
-          class="del-btn"
-          type="text"
-          danger
-          size="small"
-          title="删除"
-          @click.stop="$emit('delete', item.id)"
-        >
-          <DeleteOutlined />
-        </a-button>
+        <div v-if="showActions(item.id)" class="conv-actions">
+          <button
+            type="button"
+            class="icon-btn"
+            title="重命名"
+            @click.stop="startRename(item)"
+          >
+            <EditOutlined />
+          </button>
+          <button
+            type="button"
+            class="icon-btn danger"
+            title="删除"
+            @click.stop="$emit('delete', item.id)"
+          >
+            <DeleteOutlined />
+          </button>
+        </div>
       </li>
     </ul>
     <div class="side-foot">
@@ -149,6 +175,7 @@ function onRenameKeydown(e, item) {
   min-height: 0;
 }
 .conv-list li {
+  position: relative;
   display: flex;
   gap: 4px;
   margin-bottom: 6px;
@@ -175,24 +202,46 @@ function onRenameKeydown(e, item) {
 .conv-btn:hover {
   background: #32443c;
 }
-.del-btn {
-  flex-shrink: 0;
-  opacity: 0;
-  color: #e8b4b4 !important;
+.conv-actions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 2px;
+  padding-left: 16px;
+  background: linear-gradient(to right, transparent, #243028 14px);
 }
-.conv-list li:hover .del-btn,
-.conv-list li:focus-within .del-btn {
-  opacity: 1;
+.conv-list li.active .conv-actions {
+  background: linear-gradient(to right, transparent, #3a5248 14px);
 }
-@media (hover: none) {
-  .conv-list li.active .del-btn {
-    opacity: 1;
-  }
+.icon-btn {
+  border: 0;
+  background: transparent;
+  color: #c5d5cc;
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.conv-list :deep(.ant-input) {
+.icon-btn:hover {
+  background: #1c2622;
+  color: #fff;
+}
+.icon-btn.danger:hover {
+  color: #ff7875;
+}
+.rename-input {
   flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #3a5248;
+  border-radius: 6px;
   background: #1c2622;
   color: #e7eee9;
-  border-color: #3a5248;
+  outline: none;
 }
 </style>

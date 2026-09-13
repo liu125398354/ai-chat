@@ -146,21 +146,19 @@ async function onSend() {
     sendError.value = '单条消息最多 8000 字';
     return;
   }
+  clearComposer();
   let conversationId = conversations.currentId;
   if (!conversationId) {
     try {
       const created = await conversations.create();
       conversationId = created.id;
     } catch (err) {
+      draft.value = text;
       sendError.value = err.response?.data?.message || '创建会话失败';
       antdMessage.error(sendError.value);
       return;
     }
   }
-  draft.value = '';
-  composerKey.value += 1;
-  sendError.value = '';
-  nextTick(() => composerRef.value?.focus?.());
   if (conversations.isDefaultTitle(conversationId)) {
     conversations.touch(conversationId, titleFromUserContent(text));
   } else {
@@ -174,9 +172,21 @@ async function onRetry() {
   await chat.retryLastFailed(conversations.currentId);
 }
 
+/** 立刻清掉输入框（含原生节点），避免组件把原文写回。 */
+function clearComposer() {
+  draft.value = '';
+  const el = composerRef.value;
+  if (el) {
+    el.value = '';
+    el.dispatchEvent(new Event('input'));
+  }
+}
+
 function onKeydown(e) {
+  if (e.isComposing || e.keyCode === 229) return;
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
+    e.stopPropagation();
     onSend();
   }
 }
@@ -266,12 +276,12 @@ function onKeydown(e) {
         <a-alert v-if="sendError" type="error" :message="sendError" show-icon class="alert-gap" />
       </div>
       <div class="composer">
-        <a-textarea
+        <textarea
           :key="composerKey"
           ref="composerRef"
-          v-model:value="draft"
-          :rows="3"
-          :maxlength="8000"
+          v-model="draft"
+          rows="3"
+          maxlength="8000"
           placeholder="输入消息，Enter 发送，Shift+Enter 换行"
           :disabled="chat.generating"
           @keydown="onKeydown"
@@ -350,8 +360,20 @@ function onKeydown(e) {
   background: #fffdf8;
   flex-shrink: 0;
 }
-.composer :deep(.ant-input-textarea) {
+.composer textarea {
   flex: 1;
+  resize: none;
+  padding: 10px 12px;
+  border: 1px solid #d9d1c3;
+  border-radius: 10px;
+  background: #fff;
+  outline: none;
+}
+.composer textarea:focus {
+  border-color: #1f6f5b;
+}
+.composer textarea:disabled {
+  opacity: 0.65;
 }
 .fail-row {
   display: flex;
