@@ -5,7 +5,7 @@
   @description 工作台：左会话列表 / 中消息 / 底输入
 -->
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MarkdownView from '@/components/MarkdownView.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -18,10 +18,17 @@ const chat = useChatStore();
 const router = useRouter();
 const route = useRoute();
 const draft = ref('');
+const messagesEl = ref(null);
+const sendError = ref('');
 
 const emptyWorkbench = computed(
   () => !conversations.currentId && !conversations.loading && conversations.items.length === 0,
 );
+
+const lastAssistant = computed(() => {
+  const list = chat.messages;
+  return list.length ? list[list.length - 1] : null;
+});
 
 onMounted(async () => {
   await conversations.fetchList();
@@ -37,12 +44,30 @@ watch(
   async (id, prev) => {
     if (id === prev) return;
     if (!id) {
-      chat.abortInFlight();
-      chat.messages = [];
+      chat.clear();
       return;
     }
     await chat.load(id);
     router.replace({ query: { ...route.query, c: id } });
+  },
+);
+
+watch(
+  () => chat.generating,
+  async (now, was) => {
+    if (was && !now) {
+      await conversations.fetchList();
+    }
+  },
+);
+
+watch(
+  () => chat.messages.length,
+  async () => {
+    await nextTick();
+    if (messagesEl.value) {
+      messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
+    }
   },
 );
 
@@ -66,20 +91,30 @@ async function onLogout() {
 }
 
 async function onSend() {
+  sendError.value = '';
   const text = draft.value.trim();
   if (!text || chat.generating) return;
+  if (text.length > 8000) {
+    sendError.value = '单条消息最多 8000 字';
+    return;
+  }
   let conversationId = conversations.currentId;
   if (!conversationId) {
     try {
       const created = await conversations.create();
       conversationId = created.id;
     } catch (err) {
-      chat.error = err.response?.data?.message || '创建会话失败';
+      sendError.value = err.response?.data?.message || '创建会话失败';
       return;
     }
   }
   draft.value = '';
   await chat.send(conversationId, text);
+}
+
+async function onRetry() {
+  if (!conversations.currentId || chat.generating) return;
+  await chat.retryLastFailed(conversations.currentId);
 }
 
 function onKeydown(e) {
@@ -97,7 +132,11 @@ function onKeydown(e) {
         <strong>会话</strong>
         <button type="button" class="ghost" @click="onNewChat">新对话</button>
       </div>
-      <p v-if="conversations.loading" class="muted">加载会话列表…</p>
+      <div v-if="conversations.loading" class="skel-list" aria-hidden="true">
+        <div class="skel" />
+        <div class="skel" />
+        <div class="skel" />
+      </div>
       <p v-else-if="conversations.error" class="err">{{ conversations.error }}</p>
       <p v-else-if="conversations.items.length === 0" class="muted">还没有会话</p>
       <ul v-else class="conv-list">
@@ -119,10 +158,13 @@ function onKeydown(e) {
     </aside>
 
     <section class="main">
-      <div class="messages">
-        <p v-if="chat.loading" class="muted">加载消息…</p>
+      <div ref="messagesEl" class="messages">
+        <div v-if="chat.loading" class="skel-msg" aria-hidden="true">
+          <div class="skel wide" />
+          <div class="skel" />
+        </div>
         <p v-else-if="emptyWorkbench" class="welcome">创建新对话，或直接在下方输入以开始。</p>
-        <p v-else-if="!chat.loading && chat.messages.length === 0" class="welcome">
+        <p v-else-if="chat.messages.length === 0" class="welcome">
           这一轮还没有消息，在下方提问即可。
         </p>
         <article
@@ -132,15 +174,29 @@ function onKeydown(e) {
           :class="msg.role"
         >
           <div v-if="msg.role === 'user'" class="plain">{{ msg.content }}</div>
-          <MarkdownView v-else :source="msg.content" />
-          <p v-if="msg.status === 'failed'" class="err">{{ msg.errorCode || '生成失败' }}</p>
+          <MarkdownView
+            v-else
+            :source="msg.content"
+            :live="chat.generating && lastAssistant && lastAssistant.id === msg.id"
+          />
+          <p v-if="chat.generating && lastAssistant && lastAssistant.id === msg.id && !msg.content" class="muted">
+            生成中…
+          </p>
+          <div v-if="msg.status === 'failed'" class="fail-row">
+            <p class="err">{{ chat.error || msg.errorCode || '生成失败' }}</p>
+            <button type="button" class="retry" :disabled="chat.generating" @click="onRetry">
+              重试
+            </button>
+          </div>
         </article>
-        <p v-if="chat.error" class="err">{{ chat.error }}</p>
+        <p v-if="chat.error && lastAssistant?.status !== 'failed'" class="err">{{ chat.error }}</p>
+        <p v-if="sendError" class="err">{{ sendError }}</p>
       </div>
       <form class="composer" @submit.prevent="onSend">
         <textarea
           v-model="draft"
           rows="3"
+          maxlength="8000"
           placeholder="输入消息，Enter 发送，Shift+Enter 换行"
           :disabled="chat.generating"
           @keydown="onKeydown"
@@ -279,5 +335,44 @@ textarea {
 .err {
   color: #b42318;
   font-size: 13px;
+}
+.skel-list,
+.skel-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+.skel {
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #2c3a34, #3a5248, #2c3a34);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+.skel-msg .skel {
+  background: linear-gradient(90deg, #efe8dc, #f7f2ea, #efe8dc);
+  background-size: 200% 100%;
+  height: 48px;
+}
+.skel-msg .skel.wide {
+  width: 70%;
+}
+.fail-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.retry {
+  border: 1px solid #d9d1c3;
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 </style>

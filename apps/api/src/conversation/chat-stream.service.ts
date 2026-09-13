@@ -2,15 +2,18 @@
  * @file chat-stream.service.ts
  * @author liunannan
  * @date 2026-09-13
- * @description 流式编排骨架：锁 → 落 user → SSE；千帆循环在 M2 补齐
+ * @description 流式编排：锁 → 落 user → 千帆 delta → 落 assistant → done/error
  */
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ERROR_CODES, SSE_EVENTS } from '@ai-chat/shared';
 import { Response } from 'express';
 import { AppError } from '../common/errors/app-error';
+import { loadAppEnv } from '../config/env';
 import { ConversationLockService } from '../infrastructure/lock/conversation-lock.service';
+import { QianfanAppError } from '../infrastructure/qianfan/qianfan-error';
 import { QianfanAdapter } from '../infrastructure/qianfan/qianfan.adapter';
 import { PrismaService } from '../prisma/prisma.service';
+import { toQianfanTurns } from './chat-context';
 import { ConversationService } from './conversation.service';
 
 @Injectable()
@@ -25,7 +28,7 @@ export class ChatStreamService {
   ) {}
 
   /**
-   * 校验归属与锁后写入用户消息并打开 SSE。完整千帆 delta 在 M2 实现。
+   * 同一 conversationId 仅一路生成；鉴权失败不得进入 SSE。
    */
   async stream(
     userId: string,
@@ -43,6 +46,8 @@ export class ChatStreamService {
       );
     }
 
+    let sseStarted = false;
+    let assembled = '';
     try {
       const userMessage = await this.prisma.$transaction(async (tx) => {
         const created = await tx.message.create({
@@ -61,35 +66,123 @@ export class ChatStreamService {
       });
 
       this.writeSseHeaders(res);
+      sseStarted = true;
       this.writeEvent(res, SSE_EVENTS.META, {
         conversationId,
         userMessageId: userMessage.id,
       });
 
+      const env = loadAppEnv();
+      const history = await this.prisma.message.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: 'asc' },
+        select: { role: true, content: true },
+      });
+      const turns = toQianfanTurns(history, env.contextMaxMessages);
       this.logger.log(
-        JSON.stringify({ op: 'chat_stream_stub', conversationId, requestId }),
+        JSON.stringify({
+          op: 'chat_stream_start',
+          conversationId,
+          requestId,
+          turnCount: turns.length,
+        }),
       );
 
-      void this.qianfan;
+      for await (const delta of this.qianfan.stream(turns)) {
+        if (res.writableEnded || res.destroyed) {
+          break;
+        }
+        assembled += delta;
+        this.writeEvent(res, SSE_EVENTS.DELTA, { content: delta });
+      }
 
-      this.writeEvent(res, SSE_EVENTS.ERROR, {
-        code: ERROR_CODES.NOT_IMPLEMENTED,
-        message: '流式对话（千帆）将在 M2 接入',
+      if (!assembled) {
+        throw new QianfanAppError(ERROR_CODES.QIANFAN_ERROR, '模型未返回内容，请稍后重试');
+      }
+
+      const assistant = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.message.create({
+          data: {
+            conversationId,
+            role: 'assistant',
+            content: assembled,
+            status: 'completed',
+          },
+        });
+        await tx.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+        return created;
       });
+
+      this.writeEvent(res, SSE_EVENTS.DONE, { messageId: assistant.id });
       res.end();
     } catch (err) {
+      const mapped = this.toStreamError(err);
+      mapped.partial = assembled;
       this.logger.error(
         JSON.stringify({
           op: 'chat_stream_failed',
           conversationId,
           requestId,
-          error: err instanceof Error ? err.message : 'unknown',
+          code: mapped.code,
+          error: mapped.message,
         }),
       );
-      throw err;
+      if (!sseStarted) {
+        throw err instanceof AppError
+          ? err
+          : new AppError(mapped.code, mapped.message, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+      try {
+        const failed = await this.prisma.message.create({
+          data: {
+            conversationId,
+            role: 'assistant',
+            content: mapped.partial || '',
+            status: 'failed',
+            errorCode: mapped.code,
+          },
+        });
+        void failed;
+        this.writeEvent(res, SSE_EVENTS.ERROR, {
+          code: mapped.code,
+          message: mapped.message,
+        });
+      } catch (persistErr) {
+        this.logger.error(
+          JSON.stringify({
+            op: 'chat_stream_persist_failed',
+            conversationId,
+            requestId,
+            error: persistErr instanceof Error ? persistErr.message : 'unknown',
+          }),
+        );
+        this.writeEvent(res, SSE_EVENTS.ERROR, {
+          code: mapped.code,
+          message: mapped.message,
+        });
+      }
+      if (!res.writableEnded) {
+        res.end();
+      }
     } finally {
       this.lock.release(conversationId);
     }
+  }
+
+  private toStreamError(err: unknown): { code: string; message: string; partial?: string } {
+    if (err instanceof QianfanAppError) {
+      return { code: err.code, message: err.message };
+    }
+    if (err instanceof AppError) {
+      return { code: err.code, message: err.message };
+    }
+    return {
+      code: ERROR_CODES.QIANFAN_ERROR,
+      message: '模型服务暂时不可用',
+    };
   }
 
   private writeSseHeaders(res: Response): void {
@@ -97,10 +190,14 @@ export class ChatStreamService {
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
   }
 
   private writeEvent(res: Response, event: string, data: unknown): void {
+    if (res.writableEnded) {
+      return;
+    }
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   }

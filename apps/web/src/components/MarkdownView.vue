@@ -2,10 +2,10 @@
   @file MarkdownView.vue
   @author liunannan
   @date 2026-09-13
-  @description 助手 Markdown：markdown-it → DOMPurify 后才 v-html
+  @description 助手 Markdown：markdown-it → DOMPurify；流式节流 64ms，done 后完整渲染
 -->
 <script setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js/lib/core';
@@ -24,6 +24,7 @@ hljs.registerLanguage('shell', bash);
 
 const props = defineProps({
   source: { type: String, default: '' },
+  live: { type: Boolean, default: false },
 });
 
 const md = new MarkdownIt({
@@ -38,9 +39,38 @@ const md = new MarkdownIt({
   },
 });
 
+const displaySource = ref(props.source);
+let timer = null;
+
+watch(
+  () => [props.source, props.live],
+  () => {
+    if (!props.live) {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      displaySource.value = props.source;
+      return;
+    }
+    if (timer) return;
+    timer = setTimeout(() => {
+      displaySource.value = props.source;
+      timer = null;
+    }, 64);
+  },
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  if (timer) clearTimeout(timer);
+});
+
 const html = computed(() =>
-  DOMPurify.sanitize(md.render(props.source || ''), {
+  DOMPurify.sanitize(md.render(displaySource.value || ''), {
     USE_PROFILES: { html: true },
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
   }),
 );
 </script>
@@ -64,5 +94,9 @@ const html = computed(() =>
 }
 .md-body :deep(p) {
   margin: 0.4em 0;
+}
+.md-body :deep(ul),
+.md-body :deep(ol) {
+  padding-left: 1.2em;
 }
 </style>

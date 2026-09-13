@@ -56,6 +56,8 @@ export async function streamMessages(conversationId, body, signal, onEvent) {
       if (parsed) onEvent(parsed.event, parsed.data);
     }
   }
+  const tail = parseSseBlock(buffer);
+  if (tail) onEvent(tail.event, tail.data);
 }
 
 /** @param {string} block */
