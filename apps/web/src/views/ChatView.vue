@@ -13,6 +13,7 @@ import { message as antdMessage, Modal } from 'ant-design-vue';
 import MarkdownView from '@/components/MarkdownView.vue';
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue';
 import ConversationSidebar from '@/components/ConversationSidebar.vue';
+import EmptyFrame from '@/components/EmptyFrame.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
 import { useConversationsStore } from '@/stores/conversations';
@@ -33,8 +34,11 @@ const passwordOpen = ref(false);
 const drawerOpen = ref(false);
 const isMobile = ref(false);
 const copiedId = ref('');
+const enteringIds = ref({});
 let media = null;
 let copiedTimer = 0;
+let skipNextEnter = true;
+let prevMessageIds = [];
 
 const emptyWorkbench = computed(
   () => !conversations.currentId && !conversations.loading && conversations.items.length === 0,
@@ -76,7 +80,10 @@ watch(
   async (id, prev) => {
     if (id === prev) return;
     drawerOpen.value = false;
+    enteringIds.value = {};
     if (!id) {
+      skipNextEnter = false;
+      prevMessageIds = [];
       chat.clear();
       if (route.query.c) {
         const query = { ...route.query };
@@ -89,6 +96,7 @@ watch(
       router.replace({ query: { ...route.query, c: id } });
       return;
     }
+    skipNextEnter = true;
     await chat.load(id);
     router.replace({ query: { ...route.query, c: id } });
   },
@@ -110,6 +118,36 @@ watch(
     if (messagesEl.value) {
       messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
     }
+  },
+);
+
+watch(
+  () => [chat.loading, chat.messages.map((msg) => msg.id)],
+  ([loading, ids]) => {
+    if (skipNextEnter) {
+      if (loading) return;
+      skipNextEnter = false;
+      prevMessageIds = ids;
+      return;
+    }
+    if (ids.length > prevMessageIds.length) {
+      const added = ids.filter((id) => !prevMessageIds.includes(id));
+      if (added.length) {
+        const next = { ...enteringIds.value };
+        added.forEach((id) => {
+          next[id] = true;
+        });
+        enteringIds.value = next;
+        window.setTimeout(() => {
+          const cleared = { ...enteringIds.value };
+          added.forEach((id) => {
+            delete cleared[id];
+          });
+          enteringIds.value = cleared;
+        }, 200);
+      }
+    }
+    prevMessageIds = ids;
   },
 );
 
@@ -275,7 +313,8 @@ function onKeydown(e) {
       title="会话"
       placement="left"
       :width="280"
-      :body-style="{ padding: 0, height: 'calc(100% - 55px)', background: '#243028' }"
+      rootClassName="night-rail-drawer"
+      :body-style="{ padding: 0, height: 'calc(100% - 55px)', background: 'var(--color-rail)' }"
     >
       <ConversationSidebar
         :items="conversations.items"
@@ -306,16 +345,24 @@ function onKeydown(e) {
           </button>
         </div>
         <a-skeleton v-if="chat.loading" active :paragraph="{ rows: 4 }" />
-        <a-empty v-else-if="emptyWorkbench" description="在下方输入以开始新对话。" />
+        <a-empty v-else-if="emptyWorkbench" description="在下方输入以开始新对话。">
+          <template #image>
+            <EmptyFrame />
+          </template>
+        </a-empty>
         <a-empty
           v-else-if="chat.messages.length === 0"
           :description="conversations.currentId ? '这一轮还没有消息，在下方提问即可。' : '输入消息开始新对话。'"
-        />
+        >
+          <template #image>
+            <EmptyFrame />
+          </template>
+        </a-empty>
         <article
           v-for="msg in chat.messages"
           :key="msg.id"
           class="msg"
-          :class="msg.role"
+          :class="[msg.role, { 'msg-enter': enteringIds[msg.id] }]"
         >
           <div class="bubble">
             <div v-if="msg.role === 'user'" class="plain">{{ msg.content }}</div>
@@ -367,8 +414,9 @@ function onKeydown(e) {
   overflow: hidden;
 }
 .sidebar {
-  background: #243028 !important;
+  background: var(--color-rail) !important;
   overflow: hidden;
+  border-inline-end: 1px solid var(--color-rail-active) !important;
 }
 .sidebar :deep(.ant-layout-sider-children) {
   height: 100%;
@@ -379,7 +427,7 @@ function onKeydown(e) {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #f6f1e8;
+  background: var(--color-paper);
   overflow: hidden;
 }
 .mobile-bar {
@@ -388,9 +436,10 @@ function onKeydown(e) {
   gap: 8px;
   height: 48px;
   padding: 0 8px;
-  background: #fffdf8;
+  background: var(--color-paper-raised);
   line-height: 48px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--color-line);
 }
 .messages {
   flex: 1;
@@ -404,18 +453,19 @@ function onKeydown(e) {
   margin-bottom: 8px;
 }
 .copy-btn {
-  border: 1px solid #d9d1c3;
-  border-radius: 6px;
-  background: #fff;
-  color: #4a4338;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 4px;
+  background: var(--color-paper-raised);
+  color: var(--color-ink-muted);
   font-size: 12px;
   line-height: 1;
   padding: 4px 8px;
   cursor: pointer;
 }
 .copy-btn:hover {
-  border-color: #1f6f5b;
-  color: #1f6f5b;
+  background: var(--color-brand-soft);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
 }
 .msg {
   display: flex;
@@ -429,21 +479,38 @@ function onKeydown(e) {
 .msg.user {
   margin-left: auto;
 }
+.msg.assistant {
+  margin-right: auto;
+  align-items: flex-start;
+}
+.msg-enter {
+  animation: msg-in 180ms var(--ease-tech);
+}
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .bubble {
   min-width: 0;
   width: fit-content;
   max-width: 100%;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 8px;
 }
 .msg.user .bubble {
-  background: #1f6f5b;
+  background: var(--color-brand);
   color: #fff;
 }
 .msg.assistant .bubble {
   align-self: flex-start;
-  background: #fffdf8;
-  border: 1px solid #e4ddd0;
+  background: var(--color-paper-raised);
+  border: 1px solid var(--color-line);
 }
 .msg-copy {
   flex-shrink: 0;
@@ -458,24 +525,26 @@ function onKeydown(e) {
   align-items: flex-end;
   gap: 12px;
   padding: 16px 32px 24px;
-  border-top: 1px solid #e4ddd0;
-  background: #fffdf8;
+  border-top: 1px solid var(--color-line);
+  background: var(--color-paper-raised);
   flex-shrink: 0;
 }
 .composer textarea {
   flex: 1;
   resize: none;
   padding: 10px 12px;
-  border: 1px solid #d9d1c3;
-  border-radius: 10px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
   background: #fff;
   outline: none;
+  transition: border-color 160ms var(--ease-tech), box-shadow 160ms var(--ease-tech);
 }
 .composer textarea:focus {
-  border-color: #1f6f5b;
+  border-color: var(--color-brand);
+  box-shadow: inset 0 0 0 1px var(--color-brand);
 }
-.composer textarea:disabled {
-  opacity: 0.65;
+.composer :deep(.ant-btn-primary:disabled) {
+  opacity: 0.45;
 }
 .fail-row {
   display: flex;
@@ -485,5 +554,11 @@ function onKeydown(e) {
 }
 .alert-gap {
   margin-top: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-enter {
+    animation: none;
+  }
 }
 </style>

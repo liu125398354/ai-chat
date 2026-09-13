@@ -14,7 +14,7 @@ import zhCN from 'ant-design-vue/es/locale/zh_CN';
     :locale="zhCN"
     :theme="{
       token: {
-        colorPrimary: '#1f6f5b',
+        colorPrimary: '#3B5BDB',
         borderRadius: 8,
       },
     }"

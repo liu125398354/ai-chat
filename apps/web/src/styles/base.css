@@ -3,12 +3,32 @@
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-13
- * @description 全局基础样式；工作台高度锁在视口内滚动
+ * @description 夜窗主题 token、视口锁高、细滚动条与克制动效
  */
 :root {
+  --color-brand: #3b5bdb;
+  --color-brand-hover: #2f4bc4;
+  --color-brand-soft: #e8edff;
+  --color-signal: #7ee0ff;
+  --color-ink: #1a1d2e;
+  --color-ink-secondary: #5c6478;
+  --color-ink-muted: #6b7390;
+  --color-paper: #eef1f8;
+  --color-paper-raised: #fbfcff;
+  --color-line: #d5dcec;
+  --color-line-strong: #c5cde0;
+  --color-shadow: rgba(20, 24, 48, 0.1);
+  --color-rail: #121428;
+  --color-rail-text: #d7dcf0;
+  --color-rail-hover: #1c2040;
+  --color-rail-active: #242a52;
+  --color-rail-inset: #0c0e1c;
+  --color-horizon: #ff8a6b;
+  --ease-tech: cubic-bezier(0.22, 1, 0.36, 1);
   font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
-  color: #241f18;
+  color: var(--color-ink);
   line-height: 1.5;
+  font-size: 14px;
 }
 
 * {
@@ -29,13 +49,38 @@ textarea {
   font: inherit;
 }
 
+.ant-btn-primary {
+  transition:
+    background-color 160ms var(--ease-tech),
+    transform 160ms var(--ease-tech);
+}
+.ant-btn-primary:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.ant-drawer-content-wrapper {
+  transition: transform 200ms var(--ease-tech) !important;
+}
+
+.ant-skeleton.ant-skeleton-active .ant-skeleton-title,
+.ant-skeleton.ant-skeleton-active .ant-skeleton-paragraph > li,
+.ant-skeleton.ant-skeleton-active .ant-skeleton-avatar,
+.ant-skeleton.ant-skeleton-active .ant-skeleton-button,
+.ant-skeleton.ant-skeleton-active .ant-skeleton-input,
+.ant-skeleton.ant-skeleton-active .ant-skeleton-image {
+  background: linear-gradient(90deg, #e8edff 25%, #d5dcec 37%, #e8edff 63%);
+  background-size: 400% 100%;
+  animation-duration: 1.2s;
+  animation-timing-function: linear;
+}
+
 /* 工作台列表/消息区：细滚动条，悬停才显示滑块 */
 .thin-scroll {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 .thin-scroll:hover {
-  scrollbar-color: var(--scroll-thumb, rgba(36, 31, 24, 0.35)) transparent;
+  scrollbar-color: var(--scroll-thumb, rgba(26, 29, 46, 0.35)) transparent;
 }
 .thin-scroll::-webkit-scrollbar {
   width: 6px;
@@ -49,12 +94,36 @@ textarea {
   border-radius: 8px;
 }
 .thin-scroll:hover::-webkit-scrollbar-thumb {
-  background-color: var(--scroll-thumb, rgba(36, 31, 24, 0.35));
+  background-color: var(--scroll-thumb, rgba(26, 29, 46, 0.35));
 }
 .thin-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scroll-thumb-hover, rgba(36, 31, 24, 0.5));
+  background-color: var(--scroll-thumb-hover, rgba(26, 29, 46, 0.5));
 }
 .thin-scroll-dark {
-  --scroll-thumb: rgba(231, 238, 233, 0.32);
-  --scroll-thumb-hover: rgba(231, 238, 233, 0.5);
+  --scroll-thumb: rgba(215, 220, 240, 0.32);
+  --scroll-thumb-hover: rgba(215, 220, 240, 0.5);
+}
+
+.night-rail-drawer .ant-drawer-header {
+  background: var(--color-rail);
+  border-bottom: 1px solid var(--color-rail-active);
+}
+.night-rail-drawer .ant-drawer-title,
+.night-rail-drawer .ant-drawer-close {
+  color: var(--color-rail-text);
+}
+.night-rail-drawer .ant-drawer-content {
+  background: var(--color-rail);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ant-skeleton.ant-skeleton-active .ant-skeleton-title,
+  .ant-skeleton.ant-skeleton-active .ant-skeleton-paragraph > li,
+  .ant-skeleton.ant-skeleton-active .ant-skeleton-avatar,
+  .ant-skeleton.ant-skeleton-active .ant-skeleton-button,
+  .ant-skeleton.ant-skeleton-active .ant-skeleton-input,
+  .ant-skeleton.ant-skeleton-active .ant-skeleton-image {
+    animation: none !important;
+    background: var(--color-brand-soft) !important;
+  }
 }

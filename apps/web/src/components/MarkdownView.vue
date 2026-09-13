@@ -234,16 +234,28 @@ async function onBodyClick(event) {
 }
 .md-body :deep(.caret) {
   display: inline-block;
-  width: 7px;
-  height: 1em;
+  width: 2px;
+  height: 1.05em;
   margin-left: 2px;
-  background: #1f6f5b;
-  animation: blink 1s step-end infinite;
-  vertical-align: -0.1em;
+  background: var(--color-signal);
+  box-shadow: 0 0 8px rgba(126, 224, 255, 0.55);
+  animation: caret-breathe 1.2s ease-in-out infinite;
+  vertical-align: -0.15em;
 }
-@keyframes blink {
+@keyframes caret-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
   50% {
-    opacity: 0;
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .md-body :deep(.caret) {
+    animation: none;
+    opacity: 1;
+    box-shadow: none;
   }
 }
 </style>

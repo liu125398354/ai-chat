@@ -7,6 +7,7 @@
 -->
 <script setup>
 import { nextTick, ref } from 'vue';
+import EmptyFrame from '@/components/EmptyFrame.vue';
 
 defineProps({
   items: { type: Array, default: () => [] },
@@ -94,7 +95,11 @@ function onMenuClick({ key }, item) {
     </div>
     <a-skeleton v-if="loading" active :title="false" :paragraph="{ rows: 6 }" />
     <a-alert v-else-if="error" type="error" :message="error" show-icon />
-    <a-empty v-else-if="items.length === 0" description="还没有会话" />
+    <a-empty v-else-if="items.length === 0" description="还没有会话">
+      <template #image>
+        <EmptyFrame />
+      </template>
+    </a-empty>
     <ul v-else class="conv-list thin-scroll thin-scroll-dark">
       <li
         v-for="item in items"
@@ -106,6 +111,7 @@ function onMenuClick({ key }, item) {
         }"
         @mouseleave="onRowLeave(item.id)"
       >
+        <span class="active-bar" aria-hidden="true" />
         <input
           v-if="editingId === item.id"
           :ref="setRenameEl"
@@ -146,8 +152,8 @@ function onMenuClick({ key }, item) {
     <div class="side-foot">
       <span class="user">{{ username }}</span>
       <a-space>
-        <a-button type="link" size="small" @click="$emit('change-password')">改密</a-button>
-        <a-button type="link" size="small" @click="$emit('logout')">退出</a-button>
+        <button type="button" class="foot-link" @click="$emit('change-password')">改密</button>
+        <button type="button" class="foot-link" @click="$emit('logout')">退出</button>
       </a-space>
     </div>
   </div>
@@ -155,32 +161,62 @@ function onMenuClick({ key }, item) {
 
 <style scoped>
 .side {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
   padding: 16px 12px;
-  color: #e7eee9;
+  color: var(--color-rail-text);
+  background: var(--color-rail);
+}
+.side::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: repeating-linear-gradient(
+      0deg,
+      #fff 0 1px,
+      transparent 1px 3px
+    ),
+    repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 4px);
 }
 .side-head,
 .side-foot {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
+.side-head strong {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
 .side-foot {
   padding-top: 12px;
   font-size: 13px;
 }
-.user {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 120px;
+.side :deep(.ant-empty-description) {
+  color: var(--color-rail-text);
+}
+.foot-link {
+  border: 0;
+  background: transparent;
+  color: var(--color-rail-text);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.foot-link:hover {
+  color: #fff;
 }
 .conv-list {
+  position: relative;
   list-style: none;
   margin: 16px 0;
   padding: 0;
@@ -189,14 +225,33 @@ function onMenuClick({ key }, item) {
   min-height: 0;
 }
 .conv-list li {
+  position: relative;
   display: flex;
   gap: 4px;
   margin-bottom: 6px;
   align-items: center;
-  border-radius: 8px;
+  border-radius: 6px;
 }
-.conv-list li.active .conv-btn {
-  background: #3a5248;
+.conv-list li.active {
+  background: var(--color-rail-active);
+}
+.conv-list li:hover:not(.active) {
+  background: var(--color-rail-hover);
+}
+.active-bar {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--color-brand);
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform 160ms var(--ease-tech);
+  pointer-events: none;
+}
+.conv-list li.active .active-bar {
+  transform: scaleY(1);
 }
 .conv-btn {
   flex: 1;
@@ -204,7 +259,7 @@ function onMenuClick({ key }, item) {
   text-align: left;
   padding: 8px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -212,41 +267,43 @@ function onMenuClick({ key }, item) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.conv-btn:hover {
-  background: #32443c;
-}
 .more-btn {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
-  color: #e7eee9;
+  color: var(--color-rail-text);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
   opacity: 0;
-  visibility: hidden;
   pointer-events: none;
+  transition: opacity 120ms var(--ease-tech);
 }
 .conv-list li:hover:not(.confirming) .more-btn,
 .conv-list li.menu-open .more-btn {
   opacity: 1;
-  visibility: visible;
   pointer-events: auto;
 }
 .more-btn:hover {
-  background: #1c2622;
+  background: var(--color-rail-inset);
 }
 .rename-input {
   flex: 1;
   min-width: 0;
   padding: 6px 8px;
-  border: 1px solid #3a5248;
+  border: 1px solid var(--color-brand);
   border-radius: 6px;
-  background: #1c2622;
-  color: #e7eee9;
+  background: var(--color-rail-inset);
+  color: var(--color-rail-text);
   outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .active-bar {
+    transition: none;
+  }
 }
 </style>

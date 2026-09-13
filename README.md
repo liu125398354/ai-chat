@@ -35,8 +35,6 @@ npm run dev:web
 
 后端 **REST 接口文档页**：`http://localhost:3000/docs`（Swagger UI，可 Authorize 后试调 JSON 接口）。机器可读规范：`http://localhost:3000/docs-json`。流式 SSE 请用 fetch，对照 `docs/API.md`。
 
-界面设计见 `docs/UI.md`。静态效果图：用浏览器打开 `docs/ui-preview.html`。
-
 ## 里程碑
 
 当前为工程骨架（可编译启动、Prisma 模型、Auth/会话模块与前端路由布局）。千帆流式编排按 TECH 落在 QianfanAdapter，业务闭环见 M1–M3。
