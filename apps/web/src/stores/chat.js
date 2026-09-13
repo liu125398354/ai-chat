@@ -8,6 +8,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { listMessages } from '@/api/conversations';
 import { streamMessages } from '@/api/chat';
+import { useConversationsStore } from '@/stores/conversations';
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref([]);
@@ -92,8 +93,13 @@ export const useChatStore = defineStore('chat', () => {
         abortController.signal,
         (event, data) => {
           if (streamConversationId.value !== targetId) return;
-          if (event === 'meta' && data.userMessageId) {
-            tempUser.id = data.userMessageId;
+          if (event === 'meta') {
+            if (data.userMessageId) {
+              tempUser.id = data.userMessageId;
+            }
+            if (data.title) {
+              useConversationsStore().touch(targetId, data.title);
+            }
           }
           if (event === 'delta' && typeof data.content === 'string' && data.content) {
             tempAsst.content += data.content;

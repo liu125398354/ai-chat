@@ -2,9 +2,13 @@
   @file ConversationSidebar.vue
   @author liunannan
   @date 2026-09-13
-  @description 会话列表侧栏：新对话、滚动列表、改密与退出
+  @updated 2026-09-13
+  @description 会话列表：提问摘要标题、悬停删除、双击重命名
 -->
 <script setup>
+import { nextTick, ref } from 'vue';
+import { DeleteOutlined } from '@ant-design/icons-vue';
+
 defineProps({
   items: { type: Array, default: () => [] },
   currentId: { type: String, default: '' },
@@ -13,7 +17,42 @@ defineProps({
   username: { type: String, default: '' },
 });
 
-defineEmits(['new', 'select', 'delete', 'logout', 'change-password']);
+const emit = defineEmits(['new', 'select', 'delete', 'rename', 'logout', 'change-password']);
+
+const editingId = ref('');
+const editingTitle = ref('');
+const renameInput = ref(null);
+
+function startRename(item) {
+  editingId.value = item.id;
+  editingTitle.value = item.title;
+  nextTick(() => {
+    renameInput.value?.focus?.();
+  });
+}
+
+function cancelRename() {
+  editingId.value = '';
+  editingTitle.value = '';
+}
+
+function commitRename(item) {
+  const title = editingTitle.value.trim();
+  cancelRename();
+  if (!title || title === item.title) return;
+  emit('rename', item.id, title);
+}
+
+function onRenameKeydown(e, item) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    commitRename(item);
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    cancelRename();
+  }
+}
 </script>
 
 <template>
@@ -31,11 +70,36 @@ defineEmits(['new', 'select', 'delete', 'logout', 'change-password']);
         :key="item.id"
         :class="{ active: item.id === currentId }"
       >
-        <button type="button" class="conv-btn" @click="$emit('select', item.id)">
+        <a-input
+          v-if="editingId === item.id"
+          ref="renameInput"
+          v-model:value="editingTitle"
+          size="small"
+          maxlength="200"
+          @blur="commitRename(item)"
+          @keydown="onRenameKeydown($event, item)"
+          @click.stop
+        />
+        <button
+          v-else
+          type="button"
+          class="conv-btn"
+          :title="item.title"
+          @click="$emit('select', item.id)"
+          @dblclick.stop="startRename(item)"
+        >
           {{ item.title }}
         </button>
-        <a-button type="link" danger size="small" @click="$emit('delete', item.id)">
-          删
+        <a-button
+          v-if="editingId !== item.id"
+          class="del-btn"
+          type="text"
+          danger
+          size="small"
+          title="删除"
+          @click.stop="$emit('delete', item.id)"
+        >
+          <DeleteOutlined />
         </a-button>
       </li>
     </ul>
@@ -89,12 +153,14 @@ defineEmits(['new', 'select', 'delete', 'logout', 'change-password']);
   gap: 4px;
   margin-bottom: 6px;
   align-items: center;
+  border-radius: 8px;
 }
 .conv-list li.active .conv-btn {
   background: #3a5248;
 }
 .conv-btn {
   flex: 1;
+  min-width: 0;
   text-align: left;
   padding: 8px 10px;
   border: 0;
@@ -108,5 +174,25 @@ defineEmits(['new', 'select', 'delete', 'logout', 'change-password']);
 }
 .conv-btn:hover {
   background: #32443c;
+}
+.del-btn {
+  flex-shrink: 0;
+  opacity: 0;
+  color: #e8b4b4 !important;
+}
+.conv-list li:hover .del-btn,
+.conv-list li:focus-within .del-btn {
+  opacity: 1;
+}
+@media (hover: none) {
+  .conv-list li.active .del-btn {
+    opacity: 1;
+  }
+}
+.conv-list :deep(.ant-input) {
+  flex: 1;
+  background: #1c2622;
+  color: #e7eee9;
+  border-color: #3a5248;
 }
 </style>

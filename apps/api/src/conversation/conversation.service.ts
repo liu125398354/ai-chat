@@ -8,6 +8,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ERROR_CODES } from '@ai-chat/shared';
 import { AppError } from '../common/errors/app-error';
 import { PrismaService } from '../prisma/prisma.service';
+import { DEFAULT_CONVERSATION_TITLE } from './conversation-title';
 
 const LIST_SELECT = {
   id: true,
@@ -31,9 +32,21 @@ export class ConversationService {
   }
 
   create(userId: string, title?: string) {
-    const resolved = title && title.length > 0 ? title : '新对话';
+    const resolved = title && title.length > 0 ? title : DEFAULT_CONVERSATION_TITLE;
     return this.prisma.conversation.create({
       data: { userId, title: resolved },
+      select: LIST_SELECT,
+    });
+  }
+
+  /**
+   * 重命名须归属当前用户。
+   */
+  async rename(userId: string, conversationId: string, title: string) {
+    await this.assertOwned(userId, conversationId);
+    return this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: { title },
       select: LIST_SELECT,
     });
   }

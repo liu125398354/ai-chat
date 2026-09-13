@@ -12,6 +12,7 @@ import {
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Req,
   Res,
@@ -23,6 +24,7 @@ import { ChatStreamService } from './chat-stream.service';
 import { ConversationService } from './conversation.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { StreamMessageDto } from './dto/stream-message.dto';
+import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 @Controller('v1/conversations')
 @UseGuards(JwtAuthGuard)
@@ -42,6 +44,15 @@ export class ConversationController {
   @HttpCode(201)
   async create(@Req() req: Request, @Body() dto: CreateConversationDto) {
     return this.conversations.create(req.user!.userId, dto.title);
+  }
+
+  @Patch(':id')
+  async rename(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateConversationDto,
+  ) {
+    return this.conversations.rename(req.user!.userId, id, dto.title);
   }
 
   @Delete(':id')

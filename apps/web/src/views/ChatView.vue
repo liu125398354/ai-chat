@@ -16,6 +16,7 @@ import ConversationSidebar from '@/components/ConversationSidebar.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
 import { useConversationsStore } from '@/stores/conversations';
+import { titleFromUserContent } from '@/utils/conversation-title';
 
 const auth = useAuthStore();
 const conversations = useConversationsStore();
@@ -23,6 +24,8 @@ const chat = useChatStore();
 const router = useRouter();
 const route = useRoute();
 const draft = ref('');
+const composerKey = ref(0);
+const composerRef = ref(null);
 const messagesEl = ref(null);
 const sendError = ref('');
 const passwordOpen = ref(false);
@@ -82,7 +85,7 @@ watch(
   () => chat.generating,
   async (now, was) => {
     if (was && !now) {
-      await conversations.fetchList();
+      await conversations.fetchList({ silent: true });
     }
   },
 );
@@ -98,11 +101,22 @@ watch(
 );
 
 async function onNewChat() {
+  chat.clear();
+  draft.value = '';
+  composerKey.value += 1;
   await conversations.create();
 }
 
-async function onSelect(id) {
+function onSelect(id) {
   conversations.select(id);
+}
+
+async function onRename(id, title) {
+  try {
+    await conversations.rename(id, title);
+  } catch (err) {
+    antdMessage.error(err.response?.data?.message || '重命名失败');
+  }
 }
 
 async function onDelete(id) {
@@ -144,6 +158,14 @@ async function onSend() {
     }
   }
   draft.value = '';
+  composerKey.value += 1;
+  sendError.value = '';
+  nextTick(() => composerRef.value?.focus?.());
+  if (conversations.isDefaultTitle(conversationId)) {
+    conversations.touch(conversationId, titleFromUserContent(text));
+  } else {
+    conversations.touch(conversationId);
+  }
   await chat.send(conversationId, text);
 }
 
@@ -177,6 +199,7 @@ function onKeydown(e) {
         @new="onNewChat"
         @select="onSelect"
         @delete="onDelete"
+        @rename="onRename"
         @logout="onLogout"
         @change-password="passwordOpen = true"
       />
@@ -199,6 +222,7 @@ function onKeydown(e) {
         @new="onNewChat"
         @select="onSelect"
         @delete="onDelete"
+        @rename="onRename"
         @logout="onLogout"
         @change-password="passwordOpen = true"
       />
@@ -243,6 +267,8 @@ function onKeydown(e) {
       </div>
       <div class="composer">
         <a-textarea
+          :key="composerKey"
+          ref="composerRef"
           v-model:value="draft"
           :rows="3"
           :maxlength="8000"

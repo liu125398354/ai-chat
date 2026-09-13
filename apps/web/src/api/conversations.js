@@ -18,6 +18,10 @@ export function deleteConversation(id) {
   return http.delete(`/v1/conversations/${id}`);
 }
 
+export function renameConversation(id, title) {
+  return http.patch(`/v1/conversations/${id}`, { title }).then((res) => res.data);
+}
+
 export function listMessages(conversationId) {
   return http.get(`/v1/conversations/${conversationId}/messages`).then((res) => res.data);
 }

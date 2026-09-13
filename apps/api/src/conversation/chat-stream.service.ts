@@ -15,6 +15,7 @@ import { QianfanAdapter } from '../infrastructure/qianfan/qianfan.adapter';
 import { PrismaService } from '../prisma/prisma.service';
 import { toQianfanTurns } from './chat-context';
 import { ConversationService } from './conversation.service';
+import { DEFAULT_CONVERSATION_TITLE, titleFromUserContent } from './conversation-title';
 
 @Injectable()
 export class ChatStreamService {
@@ -58,18 +59,28 @@ export class ChatStreamService {
             status: 'completed',
           },
         });
+        const conv = await tx.conversation.findUnique({
+          where: { id: conversationId },
+          select: { title: true },
+        });
+        const nextTitle =
+          conv?.title === DEFAULT_CONVERSATION_TITLE ? titleFromUserContent(content) : undefined;
         await tx.conversation.update({
           where: { id: conversationId },
-          data: { updatedAt: new Date() },
+          data: {
+            updatedAt: new Date(),
+            ...(nextTitle ? { title: nextTitle } : {}),
+          },
         });
-        return created;
+        return { created, title: nextTitle || conv?.title || DEFAULT_CONVERSATION_TITLE };
       });
 
       this.writeSseHeaders(res);
       sseStarted = true;
       this.writeEvent(res, SSE_EVENTS.META, {
         conversationId,
-        userMessageId: userMessage.id,
+        userMessageId: userMessage.created.id,
+        title: userMessage.title,
       });
 
       const env = loadAppEnv();
