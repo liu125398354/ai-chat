@@ -10,6 +10,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { loadAppEnv } from './config/env';
+import { setupOpenApi } from './openapi/setup-openapi';
 
 async function bootstrap(): Promise<void> {
   const env = loadAppEnv();
@@ -23,6 +24,7 @@ async function bootstrap(): Promise<void> {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
+  setupOpenApi(app);
   await app.listen(env.port);
   Logger.log(`API listening on ${env.port} (qianfan model: ${env.qianfanModel})`, 'Bootstrap');
 }
