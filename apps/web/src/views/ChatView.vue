@@ -419,11 +419,12 @@ function onKeydown(e) {
 }
 .msg {
   display: flex;
+  flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
   width: fit-content;
-  max-width: 100%;
+  max-width: min(720px, 100%);
   margin: 12px 0;
+  gap: 6px;
 }
 .msg.user {
   margin-left: auto;
@@ -431,7 +432,7 @@ function onKeydown(e) {
 .bubble {
   min-width: 0;
   width: fit-content;
-  max-width: min(720px, calc(100% - 52px));
+  max-width: 100%;
   padding: 12px 14px;
   border-radius: 12px;
 }
@@ -440,12 +441,13 @@ function onKeydown(e) {
   color: #fff;
 }
 .msg.assistant .bubble {
+  align-self: flex-start;
   background: #fffdf8;
   border: 1px solid #e4ddd0;
 }
 .msg-copy {
   flex-shrink: 0;
-  margin-bottom: 2px;
+  align-self: flex-end;
 }
 .plain {
   white-space: pre-wrap;
