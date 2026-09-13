@@ -2,9 +2,19 @@
  * @file load-dotenv.ts
  * @author liunannan
  * @date 2026-09-13
- * @description 最先加载 apps/api/.env，供后续模块读取
+ * @description 最先加载 apps/api/.env（兼容 src 与 dist 启动）
  */
 import { config } from 'dotenv';
+import { existsSync } from 'fs';
 import { join } from 'path';
 
-config({ path: join(__dirname, '..', '.env') });
+const candidates = [
+  join(process.cwd(), '.env'),
+  join(__dirname, '..', '.env'),
+  join(__dirname, '..', '..', '.env'),
+];
+
+const envPath = candidates.find((p) => existsSync(p));
+if (envPath) {
+  config({ path: envPath });
+}
