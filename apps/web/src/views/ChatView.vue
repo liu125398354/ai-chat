@@ -16,6 +16,7 @@ import ConversationSidebar from '@/components/ConversationSidebar.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
 import { useConversationsStore } from '@/stores/conversations';
+import { copyText } from '@/utils/clipboard';
 import { titleFromUserContent } from '@/utils/conversation-title';
 
 const auth = useAuthStore();
@@ -31,7 +32,9 @@ const sendError = ref('');
 const passwordOpen = ref(false);
 const drawerOpen = ref(false);
 const isMobile = ref(false);
+const copiedId = ref('');
 let media = null;
+let copiedTimer = 0;
 
 const emptyWorkbench = computed(
   () => !conversations.currentId && !conversations.loading && conversations.items.length === 0,
@@ -65,6 +68,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   media?.removeEventListener('change', syncViewport);
+  if (copiedTimer) window.clearTimeout(copiedTimer);
 });
 
 watch(
@@ -200,6 +204,38 @@ async function onRetry() {
   await chat.retryLastFailed(conversations.currentId);
 }
 
+function markCopied(id) {
+  copiedId.value = id;
+  if (copiedTimer) window.clearTimeout(copiedTimer);
+  copiedTimer = window.setTimeout(() => {
+    copiedId.value = '';
+    copiedTimer = 0;
+  }, 1500);
+}
+
+/** 复制单条消息原文（Markdown/纯文本）。 */
+async function copyMessage(msg) {
+  const ok = await copyText(msg.content || '');
+  if (!ok) {
+    antdMessage.error('复制失败');
+    return;
+  }
+  markCopied(msg.id);
+}
+
+/** 按角色拼接当前会话全部消息。 */
+async function copyThread() {
+  const text = chat.messages
+    .map((msg) => `${msg.role === 'user' ? '用户' : '助手'}\n${msg.content || ''}`)
+    .join('\n\n---\n\n');
+  const ok = await copyText(text);
+  if (!ok) {
+    antdMessage.error('复制失败');
+    return;
+  }
+  markCopied('thread');
+}
+
 function onKeydown(e) {
   if (e.isComposing || e.keyCode === 229) return;
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -264,6 +300,11 @@ function onKeydown(e) {
         <span>AI Chat</span>
       </a-layout-header>
       <div ref="messagesEl" class="messages thin-scroll">
+        <div v-if="chat.messages.length" class="thread-bar">
+          <button type="button" class="copy-btn" @click="copyThread">
+            {{ copiedId === 'thread' ? '已复制会话' : '复制本会话' }}
+          </button>
+        </div>
         <a-skeleton v-if="chat.loading" active :paragraph="{ rows: 4 }" />
         <a-empty v-else-if="emptyWorkbench" description="在下方输入以开始新对话。" />
         <a-empty
@@ -276,6 +317,9 @@ function onKeydown(e) {
           class="bubble"
           :class="msg.role"
         >
+          <button type="button" class="copy-btn msg-copy" @click="copyMessage(msg)">
+            {{ copiedId === msg.id ? '已复制' : '复制' }}
+          </button>
           <div v-if="msg.role === 'user'" class="plain">{{ msg.content }}</div>
           <MarkdownView
             v-else
@@ -352,11 +396,48 @@ function onKeydown(e) {
   overflow: auto;
   padding: 24px 32px;
 }
+.thread-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.copy-btn {
+  border: 1px solid #d9d1c3;
+  border-radius: 6px;
+  background: #fff;
+  color: #4a4338;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.copy-btn:hover {
+  border-color: #1f6f5b;
+  color: #1f6f5b;
+}
 .bubble {
+  position: relative;
   max-width: 720px;
   margin: 12px 0;
-  padding: 12px 14px;
+  padding: 28px 14px 12px;
   border-radius: 12px;
+}
+.msg-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+.bubble:hover .msg-copy,
+.bubble:focus-within .msg-copy {
+  opacity: 1;
+  pointer-events: auto;
+}
+.bubble.user .msg-copy {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
 }
 .bubble.user {
   margin-left: auto;

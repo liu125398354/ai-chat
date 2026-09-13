@@ -3,45 +3,24 @@
   @author liunannan
   @date 2026-09-13
   @updated 2026-09-13
-  @description 助手 Markdown：markdown-it → DOMPurify；流式光标跟在末字后
+  @description 助手 Markdown：KaTeX 公式 + GitHub 风格 + 代码复制；消毒后 v-html
 -->
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import MarkdownIt from 'markdown-it';
 import DOMPurify from 'dompurify';
-import hljs from 'highlight.js/lib/core';
-import javascript from 'highlight.js/lib/languages/javascript';
-import json from 'highlight.js/lib/languages/json';
-import python from 'highlight.js/lib/languages/python';
-import bash from 'highlight.js/lib/languages/bash';
+import { markdown as md } from '@/utils/markdown';
+import { copyText } from '@/utils/clipboard';
+import 'katex/dist/katex.min.css';
+import 'github-markdown-css/github-markdown-light.css';
 import 'highlight.js/styles/github.min.css';
-
-hljs.registerLanguage('javascript', javascript);
-hljs.registerLanguage('js', javascript);
-hljs.registerLanguage('json', json);
-hljs.registerLanguage('python', python);
-hljs.registerLanguage('bash', bash);
-hljs.registerLanguage('shell', bash);
 
 const props = defineProps({
   source: { type: String, default: '' },
   live: { type: Boolean, default: false },
 });
-
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-  highlight(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value;
-    }
-    return md.utils.escapeHtml(code);
-  },
-});
-
 const displaySource = ref(props.source);
 let raf = 0;
+let copiedTimer = 0;
 
 function paint() {
   displaySource.value = props.source;
@@ -67,6 +46,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf);
+  if (copiedTimer) window.clearTimeout(copiedTimer);
 });
 
 const VOID_TAGS = new Set(['HR', 'BR', 'IMG']);
@@ -108,58 +88,111 @@ function withLiveCaret(html) {
 
 const html = computed(() => {
   const sanitized = DOMPurify.sanitize(md.render(displaySource.value || ''), {
-    USE_PROFILES: { html: true },
+    USE_PROFILES: { html: true, mathMl: true },
+    ADD_ATTR: ['class', 'style', 'aria-hidden', 'aria-label', 'type', 'encoding'],
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
   });
   return props.live ? withLiveCaret(sanitized) : sanitized;
 });
+
+/** 代码块「复制」走事件委托，避免把源码放进属性。 */
+async function onBodyClick(event) {
+  const btn = event.target.closest?.('.code-copy');
+  if (!btn || !event.currentTarget.contains(btn)) return;
+  event.preventDefault();
+  const block = btn.closest('.code-block');
+  const text = block?.querySelector('pre')?.innerText ?? '';
+  const ok = await copyText(text);
+  if (!ok) return;
+  btn.textContent = '已复制';
+  if (copiedTimer) window.clearTimeout(copiedTimer);
+  copiedTimer = window.setTimeout(() => {
+    btn.textContent = '复制';
+    copiedTimer = 0;
+  }, 1500);
+}
 </script>
 
 <template>
   <div class="md-wrap">
-    <div class="md-body" v-html="html" />
+    <div class="md-body markdown-body" v-html="html" @click="onBodyClick" />
   </div>
 </template>
 
 <style scoped>
 .md-wrap {
   position: relative;
+  min-width: 0;
 }
-.md-body :deep(pre) {
-  overflow: auto;
-  padding: 12px;
+.md-body {
+  background: transparent !important;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+  max-width: none;
+}
+.md-body :deep(.katex-display-wrap) {
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.md-body :deep(.code-block) {
+  position: relative;
+  margin: 0.8em 0;
+  border: 1px solid #d0d7de;
   border-radius: 8px;
-  background: #1e2430;
-  color: #e8edf5;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
+  overflow: hidden;
+  background: #f6f8fa;
+}
+.md-body :deep(.code-head) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #f3f4f6;
+  border-bottom: 1px solid #d0d7de;
+  font-size: 12px;
+  color: #656d76;
+}
+.md-body :deep(.code-copy) {
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2328;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.md-body :deep(.code-copy:hover) {
+  background: #f6f8fa;
+}
+.md-body :deep(.code-block pre) {
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  background: #f6f8fa;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
-.md-body :deep(pre:hover) {
-  scrollbar-color: rgba(232, 237, 245, 0.35) transparent;
+.md-body :deep(.code-block pre:hover) {
+  scrollbar-color: rgba(31, 35, 40, 0.28) transparent;
 }
-.md-body :deep(pre)::-webkit-scrollbar {
+.md-body :deep(.code-block pre)::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-.md-body :deep(pre)::-webkit-scrollbar-thumb {
+.md-body :deep(.code-block pre)::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 8px;
 }
-.md-body :deep(pre:hover)::-webkit-scrollbar-thumb {
-  background: rgba(232, 237, 245, 0.35);
+.md-body :deep(.code-block pre:hover)::-webkit-scrollbar-thumb {
+  background: rgba(31, 35, 40, 0.28);
 }
-.md-body :deep(a) {
-  color: #2f6f5e;
-}
-.md-body :deep(p) {
-  margin: 0.4em 0;
-}
-.md-body :deep(ul),
-.md-body :deep(ol) {
-  padding-left: 1.2em;
+.md-body :deep(.code-block code.hljs) {
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
 }
 .md-body :deep(.caret) {
   display: inline-block;
@@ -171,6 +204,8 @@ const html = computed(() => {
   vertical-align: -0.1em;
 }
 @keyframes blink {
-  50% { opacity: 0; }
+  50% {
+    opacity: 0;
+  }
 }
 </style>
