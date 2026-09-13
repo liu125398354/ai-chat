@@ -2,6 +2,7 @@
  * @file conversation.controller.ts
  * @author liunannan
  * @date 2026-09-13
+ * @updated 2026-09-13
  * @description 会话与消息 HTTP/SSE；userId 只来自 JWT
  */
 import {
@@ -78,6 +79,6 @@ export class ConversationController {
     @Body() dto: StreamMessageDto,
   ): Promise<void> {
     const requestId = req.requestId || 'unknown';
-    await this.chatStream.stream(req.user!.userId, id, dto.content, res, requestId);
+    await this.chatStream.stream(req.user!.userId, id, dto.content, req, res, requestId);
   }
 }

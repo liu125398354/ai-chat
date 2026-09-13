@@ -2,7 +2,8 @@
  * @file chat.js
  * @author liunannan
  * @date 2026-09-13
- * @description 当前会话消息与 generating；切会话 abort 防串台；generating 时拒绝第二路
+ * @updated 2026-09-13
+ * @description 当前会话消息与 generating；切会话 abort 前端 SSE，服务端据此停千帆；generating 时拒绝第二路
  */
 import { defineStore } from 'pinia';
 import { ref } from 'vue';

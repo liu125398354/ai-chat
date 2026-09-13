@@ -2,12 +2,19 @@
  * @file qianfan.adapter.ts
  * @author liunannan
  * @date 2026-09-13
- * @description 千帆 ChatCompletion 流式适配：只在此使用官方 SDK
+ * @updated 2026-09-13
+ * @description 千帆 ChatCompletion 流式适配：只在此使用官方 SDK；支持 AbortSignal 取消上游
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { ERROR_CODES } from '@ai-chat/shared';
 import { loadAppEnv } from '../../config/env';
 import { mapQianfanFailure, QianfanAppError } from './qianfan-error';
+import {
+  abortQianfanStream,
+  clientAbortedError,
+  isClientAbortError,
+  type QianfanStreamHandle,
+} from './qianfan-stream-abort';
 import type { QianfanTurn } from '../../conversation/chat-context';
 
 type QianfanChunk = {
@@ -25,10 +32,14 @@ export class QianfanAdapter {
 
   /**
    * 迭代纯文本增量；空包（仅 usage/安全）跳过。超时与厂商错误映射为 QianfanAppError。
+   * `signal` 中止时 abort SDK Stream.controller，以关闭对千帆的 HTTP。
    */
-  async *stream(messages: QianfanTurn[]): AsyncGenerator<string> {
+  async *stream(messages: QianfanTurn[], signal?: AbortSignal): AsyncGenerator<string> {
     if (messages.length === 0) {
       throw new QianfanAppError(ERROR_CODES.QIANFAN_ERROR, '没有可发送给模型的上下文');
+    }
+    if (signal?.aborted) {
+      throw clientAbortedError();
     }
 
     const env = loadAppEnv();
@@ -40,14 +51,30 @@ export class QianfanAdapter {
       ENABLE_OAUTH: false,
     });
 
+    let handle: QianfanStreamHandle | undefined;
+    const onAbort = (): void => {
+      abortQianfanStream(handle);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     try {
       const stream = (await client.chat(
         { messages, stream: true },
         env.qianfanModel,
-      )) as AsyncIterable<QianfanChunk>;
+      )) as QianfanStreamHandle & AsyncIterable<QianfanChunk>;
+      handle = stream;
+      if (signal?.aborted) {
+        abortQianfanStream(handle);
+        throw clientAbortedError();
+      }
 
       for await (const chunk of stream) {
+        if (signal?.aborted) {
+          abortQianfanStream(handle);
+          throw clientAbortedError();
+        }
         if (Date.now() - started > env.qianfanTimeoutMs) {
+          abortQianfanStream(handle);
           throw new QianfanAppError(ERROR_CODES.QIANFAN_TIMEOUT, '生成超时，请稍后重试');
         }
         if (chunk?.error_code || chunk?.error_msg) {
@@ -64,7 +91,23 @@ export class QianfanAdapter {
           yield delta;
         }
       }
+
+      if (signal?.aborted) {
+        throw clientAbortedError();
+      }
     } catch (err) {
+      if (err instanceof QianfanAppError && err.code === ERROR_CODES.CLIENT_ABORTED) {
+        throw err;
+      }
+      if (signal?.aborted || isClientAbortError(err)) {
+        this.logger.log(
+          JSON.stringify({
+            op: 'qianfan_stream_aborted',
+            model: env.qianfanModel,
+          }),
+        );
+        throw clientAbortedError();
+      }
       this.logger.warn(
         JSON.stringify({
           op: 'qianfan_stream_failed',
@@ -76,6 +119,11 @@ export class QianfanAdapter {
         throw err;
       }
       throw mapQianfanFailure(err);
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
+      if (signal?.aborted) {
+        abortQianfanStream(handle);
+      }
     }
   }
 }

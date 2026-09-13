@@ -2,16 +2,19 @@
  * @file chat-stream.service.ts
  * @author liunannan
  * @date 2026-09-13
- * @description 流式编排：锁 → 落 user → 千帆 delta → 落 assistant → done/error
+ * @updated 2026-09-13
+ * @description 流式编排：锁 → 落 user → 千帆 delta → 落 assistant → done/error；客户端断开则 abort 千帆
  */
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ERROR_CODES, SSE_EVENTS } from '@ai-chat/shared';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AppError } from '../common/errors/app-error';
 import { loadAppEnv } from '../config/env';
+import { bindClientDisconnect } from '../infrastructure/http/client-disconnect';
 import { ConversationLockService } from '../infrastructure/lock/conversation-lock.service';
 import { QianfanAppError } from '../infrastructure/qianfan/qianfan-error';
 import { QianfanAdapter } from '../infrastructure/qianfan/qianfan.adapter';
+import { isClientAbortError } from '../infrastructure/qianfan/qianfan-stream-abort';
 import { PrismaService } from '../prisma/prisma.service';
 import { toQianfanTurns } from './chat-context';
 import { ConversationService } from './conversation.service';
@@ -30,11 +33,13 @@ export class ChatStreamService {
 
   /**
    * 同一 conversationId 仅一路生成；鉴权失败不得进入 SSE。
+   * 客户端断开 SSE 时 abort 千帆上游，助手按 failed + CLIENT_ABORTED 落库（有增量时）。
    */
   async stream(
     userId: string,
     conversationId: string,
     content: string,
+    req: Request,
     res: Response,
     requestId: string,
   ): Promise<void> {
@@ -47,6 +52,7 @@ export class ChatStreamService {
       );
     }
 
+    const disconnect = bindClientDisconnect(req, res);
     let sseStarted = false;
     let assembled = '';
     try {
@@ -99,17 +105,27 @@ export class ChatStreamService {
         }),
       );
 
-      for await (const delta of this.qianfan.stream(turns)) {
-        if (res.writableEnded || res.destroyed) {
+      for await (const delta of this.qianfan.stream(turns, disconnect.signal)) {
+        if (disconnect.signal.aborted || res.writableEnded || res.destroyed) {
           break;
         }
         assembled += delta;
         this.writeEvent(res, SSE_EVENTS.DELTA, { content: delta });
       }
 
+      if (disconnect.signal.aborted || res.destroyed) {
+        await this.persistAborted(conversationId, assembled, requestId);
+        if (!res.writableEnded && !res.destroyed) {
+          res.end();
+        }
+        return;
+      }
+
       if (!assembled) {
         throw new QianfanAppError(ERROR_CODES.QIANFAN_ERROR, '模型未返回内容，请稍后重试');
       }
+
+      disconnect.markCompleted();
 
       const assistant = await this.prisma.$transaction(async (tx) => {
         const created = await tx.message.create({
@@ -130,6 +146,13 @@ export class ChatStreamService {
       this.writeEvent(res, SSE_EVENTS.DONE, { messageId: assistant.id });
       res.end();
     } catch (err) {
+      if (isClientAbortError(err) || disconnect.signal.aborted) {
+        await this.persistAborted(conversationId, assembled, requestId);
+        if (!res.writableEnded && !res.destroyed) {
+          res.end();
+        }
+        return;
+      }
       const mapped = this.toStreamError(err);
       mapped.partial = assembled;
       this.logger.error(
@@ -179,7 +202,51 @@ export class ChatStreamService {
         res.end();
       }
     } finally {
+      disconnect.dispose();
       this.lock.release(conversationId);
+    }
+  }
+
+  /** 断开后不再推 SSE；有增量则落 failed，便于回会话后重试。 */
+  private async persistAborted(
+    conversationId: string,
+    assembled: string,
+    requestId: string,
+  ): Promise<void> {
+    this.logger.log(
+      JSON.stringify({
+        op: 'chat_stream_aborted',
+        conversationId,
+        requestId,
+        partialLength: assembled.length,
+      }),
+    );
+    if (!assembled) {
+      return;
+    }
+    try {
+      await this.prisma.message.create({
+        data: {
+          conversationId,
+          role: 'assistant',
+          content: assembled,
+          status: 'failed',
+          errorCode: ERROR_CODES.CLIENT_ABORTED,
+        },
+      });
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      });
+    } catch (persistErr) {
+      this.logger.error(
+        JSON.stringify({
+          op: 'chat_stream_persist_failed',
+          conversationId,
+          requestId,
+          error: persistErr instanceof Error ? persistErr.message : 'unknown',
+        }),
+      );
     }
   }
 
@@ -206,12 +273,19 @@ export class ChatStreamService {
   }
 
   private writeEvent(res: Response, event: string, data: unknown): void {
-    if (res.writableEnded) {
+    if (res.writableEnded || res.destroyed) {
       return;
     }
-    res.write(`event: ${event}\n`);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-    const flushable = res as Response & { flush?: () => void };
-    flushable.flush?.();
+    try {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      const flushable = res as Response & { flush?: () => void };
+      flushable.flush?.();
+    } catch (err) {
+      if (res.destroyed || res.writableEnded) {
+        return;
+      }
+      throw err;
+    }
   }
 }

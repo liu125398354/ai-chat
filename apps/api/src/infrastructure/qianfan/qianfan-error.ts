@@ -2,7 +2,8 @@
  * @file qianfan-error.ts
  * @author liunannan
  * @date 2026-09-13
- * @description 千帆错误映射为产品 QIANFAN_* 码；message 不含 AK/SK
+ * @updated 2026-09-13
+ * @description 千帆错误映射为产品 QIANFAN_* / CLIENT_ABORTED 码；message 不含 AK/SK
  */
 import { ERROR_CODES } from '@ai-chat/shared';
 
@@ -30,6 +31,9 @@ export function mapQianfanFailure(err: unknown): QianfanAppError {
   const text = extractText(err).toLowerCase();
   const codeNum = extractErrorCode(err);
 
+  if (isClientAbort(text, err)) {
+    return new QianfanAppError(ERROR_CODES.CLIENT_ABORTED, '客户端已断开');
+  }
   if (isTimeout(text, err)) {
     return new QianfanAppError(ERROR_CODES.QIANFAN_TIMEOUT, '生成超时，请稍后重试');
   }
@@ -62,6 +66,16 @@ function extractErrorCode(err: unknown): number | undefined {
     return typeof value === 'number' ? value : Number(value);
   }
   return undefined;
+}
+
+function isClientAbort(text: string, err: unknown): boolean {
+  if (err instanceof QianfanAppError && err.code === ERROR_CODES.CLIENT_ABORTED) {
+    return true;
+  }
+  if (err instanceof Error && err.name === 'AbortError') {
+    return true;
+  }
+  return /request was aborted/.test(text);
 }
 
 function isTimeout(text: string, err: unknown): boolean {
