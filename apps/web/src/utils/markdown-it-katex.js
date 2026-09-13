@@ -2,7 +2,8 @@
  * @file markdown-it-katex.js
  * @author liunannan
  * @date 2026-09-13
- * @description markdown-it 插件：渲染 $...$ / $$...$$ / \\(...\\) / \\[...\\] 为 KaTeX
+ * @updated 2026-09-13
+ * @description markdown-it 插件：宽松解析 $...$ / $$...$$ / \\(...\\) / \\[...\\] 为 KaTeX
  */
 import katex from 'katex';
 
@@ -10,59 +11,59 @@ const KATEX_OPTS = {
   throwOnError: false,
   strict: 'ignore',
   output: 'html',
+  minRuleThickness: 0.04,
 };
 
+const DISPLAY_ENV =
+  /\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|cases|aligned|align\*?|equation\*?|gather\*?)\}/;
+
 function renderKatex(tex, displayMode) {
+  const src = tex.trim();
+  const display = displayMode || DISPLAY_ENV.test(src);
   try {
-    return katex.renderToString(tex, { ...KATEX_OPTS, displayMode });
+    return katex.renderToString(src, { ...KATEX_OPTS, displayMode: display });
   } catch {
-    const esc = tex.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const esc = src.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return `<code>${esc}</code>`;
   }
 }
 
-function isValidDollar(state, pos) {
-  const max = state.posMax;
-  const prev = pos > 0 ? state.src.charCodeAt(pos - 1) : -1;
-  const next = pos + 1 <= max ? state.src.charCodeAt(pos + 1) : -1;
-  if (prev === 0x5c) return false;
-  if (next === 0x20 || next === 0x09) return { canOpen: false, canClose: true };
-  if (prev === 0x20 || prev === 0x09 || prev === -1) return { canOpen: true, canClose: false };
-  return { canOpen: true, canClose: true };
+function isEscaped(src, pos) {
+  let n = 0;
+  while (pos - n - 1 >= 0 && src.charCodeAt(pos - n - 1) === 0x5c) n += 1;
+  return n % 2 === 1;
 }
 
 function mathInline(state, silent) {
-  if (state.src[state.pos] !== '$') return false;
-  if (state.src[state.pos + 1] === '$') return false;
-  const valid = isValidDollar(state, state.pos);
-  if (!valid.canOpen) {
-    if (!silent) state.pending += '$';
-    state.pos += 1;
-    return true;
-  }
-  let pos = state.pos + 1;
-  let found = false;
-  while (pos < state.posMax) {
-    if (state.src[pos] === '$' && state.src[pos - 1] !== '\\') {
-      const close = isValidDollar(state, pos);
-      if (close.canClose) {
-        found = true;
+  const start = state.pos;
+  if (state.src.charCodeAt(start) !== 0x24) return false;
+  if (isEscaped(state.src, start)) return false;
+  const display = state.src.charCodeAt(start + 1) === 0x24;
+  const openLen = display ? 2 : 1;
+
+  let close = -1;
+  for (let i = start + openLen; i < state.posMax; i += 1) {
+    if (state.src.charCodeAt(i) !== 0x24) continue;
+    if (isEscaped(state.src, i)) continue;
+    if (display) {
+      if (state.src.charCodeAt(i + 1) === 0x24) {
+        close = i;
         break;
       }
+    } else if (state.src.charCodeAt(i + 1) !== 0x24) {
+      close = i;
+      break;
     }
-    pos += 1;
   }
-  if (!found) {
-    if (!silent) state.pending += '$';
-    state.pos += 1;
-    return true;
-  }
+  if (close < 0) return false;
+  const content = state.src.slice(start + openLen, close).trim();
+  if (!content) return false;
   if (!silent) {
-    const token = state.push('math_inline', 'math', 0);
-    token.content = state.src.slice(state.pos + 1, pos);
-    token.markup = '$';
+    const token = state.push(display ? 'math_display' : 'math_inline', 'math', 0);
+    token.content = content;
+    token.markup = display ? '$$' : '$';
   }
-  state.pos = pos + 1;
+  state.pos = close + openLen;
   return true;
 }
 
@@ -106,10 +107,28 @@ function mathParenInline(state, silent) {
   if (state.src.slice(state.pos, state.pos + 2) !== '\\(') return false;
   const end = state.src.indexOf('\\)', state.pos + 2);
   if (end < 0) return false;
+  const content = state.src.slice(state.pos + 2, end).trim();
+  if (!content) return false;
   if (!silent) {
     const token = state.push('math_inline', 'math', 0);
-    token.content = state.src.slice(state.pos + 2, end);
+    token.content = content;
     token.markup = '\\(';
+  }
+  state.pos = end + 2;
+  return true;
+}
+
+function mathBracketInline(state, silent) {
+  if (state.src.slice(state.pos, state.pos + 2) !== '\\[') return false;
+  const end = state.src.indexOf('\\]', state.pos + 2);
+  if (end < 0) return false;
+  const content = state.src.slice(state.pos + 2, end).trim();
+  if (!content) return false;
+  if (!silent) {
+    const token = state.push('math_block', 'math', 0);
+    token.content = content;
+    token.markup = '\\[';
+    token.block = true;
   }
   state.pos = end + 2;
   return true;
@@ -118,12 +137,11 @@ function mathParenInline(state, silent) {
 function mathBracketBlock(state, start, end, silent) {
   const pos = state.bMarks[start] + state.tShift[start];
   const max = state.eMarks[start];
-  const open = state.src.slice(pos, max).trimStart();
-  if (!open.startsWith('\\[')) return false;
+  const first = state.src.slice(pos, max);
+  if (!first.trimStart().startsWith('\\[')) return false;
   let next = start;
   let closed = false;
   let content = '';
-  const first = state.src.slice(pos, max);
   const inlineEnd = first.indexOf('\\]');
   if (inlineEnd >= 0) {
     content = first.slice(first.indexOf('\\[') + 2, inlineEnd);
@@ -156,15 +174,25 @@ function mathBracketBlock(state, start, end, silent) {
 
 /** @param {import('markdown-it')} md */
 export function markdownItKatex(md) {
+  md.inline.ruler.before('escape', 'math_paren', mathParenInline);
+  md.inline.ruler.before('escape', 'math_bracket_inline', mathBracketInline);
   md.inline.ruler.after('backticks', 'math_inline', mathInline);
-  md.inline.ruler.after('math_inline', 'math_paren', mathParenInline);
   md.block.ruler.before('fence', 'math_block', mathBlock, {
     alt: ['paragraph', 'reference', 'blockquote', 'list'],
   });
   md.block.ruler.before('fence', 'math_bracket', mathBracketBlock, {
     alt: ['paragraph', 'reference', 'blockquote', 'list'],
   });
-  md.renderer.rules.math_inline = (tokens, idx) => renderKatex(tokens[idx].content, false);
+  md.renderer.rules.math_inline = (tokens, idx) => {
+    const tex = tokens[idx].content;
+    const html = renderKatex(tex, false);
+    if (DISPLAY_ENV.test(tex.trim())) {
+      return `<div class="katex-display-wrap">${html}</div>`;
+    }
+    return html;
+  };
+  md.renderer.rules.math_display = (tokens, idx) =>
+    `<div class="katex-display-wrap">${renderKatex(tokens[idx].content, true)}</div>\n`;
   md.renderer.rules.math_block = (tokens, idx) =>
     `<div class="katex-display-wrap">${renderKatex(tokens[idx].content, true)}</div>\n`;
 }

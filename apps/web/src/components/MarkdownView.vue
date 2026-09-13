@@ -14,6 +14,22 @@ import 'katex/dist/katex.min.css';
 import 'github-markdown-css/github-markdown-light.css';
 import 'highlight.js/styles/github.min.css';
 
+let katexHooked = false;
+
+function ensureKatexPurifyHook() {
+  if (katexHooked) return;
+  katexHooked = true;
+  DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+    if (data.attrName !== 'style') return;
+    const inKatex =
+      node.classList?.contains('katex') ||
+      (typeof node.closest === 'function' && node.closest('.katex'));
+    if (inKatex) {
+      data.forceKeepAttr = true;
+    }
+  });
+}
+
 const props = defineProps({
   source: { type: String, default: '' },
   live: { type: Boolean, default: false },
@@ -87,6 +103,7 @@ function withLiveCaret(html) {
 }
 
 const html = computed(() => {
+  ensureKatexPurifyHook();
   const sanitized = DOMPurify.sanitize(md.render(displaySource.value || ''), {
     USE_PROFILES: { html: true, mathMl: true },
     ADD_ATTR: ['class', 'style', 'aria-hidden', 'aria-label', 'type', 'encoding'],
@@ -132,9 +149,30 @@ async function onBodyClick(event) {
   line-height: 1.65;
   max-width: none;
 }
+.md-body :deep(.katex),
+.md-body :deep(.katex *) {
+  box-sizing: content-box;
+}
+.md-body :deep(.katex) {
+  display: inline-block;
+  vertical-align: middle;
+  overflow: visible;
+  font-size: 1.21em;
+  line-height: 1.2;
+  text-indent: 0;
+}
 .md-body :deep(.katex-display-wrap) {
   overflow-x: auto;
+  overflow-y: hidden;
   margin: 0.8em 0;
+  text-align: center;
+}
+.md-body :deep(.katex-display) {
+  display: block;
+  margin: 0.4em 0;
+}
+.md-body :deep(.katex-html) {
+  overflow: visible;
 }
 .md-body :deep(.code-block) {
   position: relative;

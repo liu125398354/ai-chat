@@ -7,7 +7,7 @@
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js/lib/common';
 import latex from 'highlight.js/lib/languages/latex';
-import { markdownItKatex } from '@/utils/markdown-it-katex';
+import { markdownItKatex } from './markdown-it-katex.js';
 
 hljs.registerLanguage('latex', latex);
 hljs.registerLanguage('tex', latex);
@@ -64,6 +64,21 @@ function renderFence(md) {
   };
 }
 
+const MATH_ENV =
+  /(?:^|\n)([ \t]*)\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|cases|aligned|align\*?|equation\*?|gather\*?)\}([\s\S]*?)\\end\{\2\}/g;
+
+/**
+ * 模型常直接输出 \\begin{vmatrix} 而不加 $$；已在公式环境内则跳过。
+ */
+export function wrapBareMathEnvs(src) {
+  return src.replace(MATH_ENV, (full, indent, env, body, offset) => {
+    const before = src.slice(0, offset);
+    if ((before.match(/\$\$/g) || []).length % 2 === 1) return full;
+    if (/\\\[\s*$/.test(before)) return full;
+    return `\n${indent}$$\\begin{${env}}${body}\\end{${env}}$$\n`;
+  });
+}
+
 export function createMarkdown() {
   const md = new MarkdownIt({
     html: false,
@@ -73,6 +88,8 @@ export function createMarkdown() {
   });
   md.use(markdownItKatex);
   md.renderer.rules.fence = renderFence(md);
+  const orig = md.render.bind(md);
+  md.render = (src, env) => orig(wrapBareMathEnvs(src || ''), env);
   return md;
 }
 
