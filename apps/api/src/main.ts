@@ -24,7 +24,7 @@ async function bootstrap(): Promise<void> {
   );
   app.useGlobalFilters(new HttpExceptionFilter());
   await app.listen(env.port);
-  Logger.log(`API listening on ${env.port}`, 'Bootstrap');
+  Logger.log(`API listening on ${env.port} (qianfan model: ${env.qianfanModel})`, 'Bootstrap');
 }
 
 bootstrap().catch((err: unknown) => {

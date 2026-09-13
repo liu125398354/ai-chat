@@ -16,5 +16,6 @@ const candidates = [
 
 const envPath = candidates.find((p) => existsSync(p));
 if (envPath) {
-  config({ path: envPath });
+  // override：改 .env 后重启进程时覆盖旧的 process.env（dotenv 默认不覆盖）
+  config({ path: envPath, override: true });
 }

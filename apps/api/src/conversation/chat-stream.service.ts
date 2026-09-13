@@ -101,6 +101,7 @@ export class ChatStreamService {
           op: 'chat_stream_start',
           conversationId,
           requestId,
+          model: env.qianfanModel,
           turnCount: turns.length,
         }),
       );
