@@ -66,12 +66,21 @@ export class HttpExceptionFilter implements ExceptionFilter {
         });
         return;
       }
+      if (status === HttpStatus.NOT_FOUND) {
+        res.status(status).json({
+          code: ERROR_CODES.NOT_FOUND,
+          message: '接口不存在',
+          requestId,
+        });
+        return;
+      }
       const message =
         typeof raw === 'string'
           ? raw
           : (raw as { message?: string | string[] }).message;
+      const isServerError = status >= HttpStatus.INTERNAL_SERVER_ERROR;
       res.status(status).json({
-        code: ERROR_CODES.INTERNAL_ERROR,
+        code: isServerError ? ERROR_CODES.INTERNAL_ERROR : `HTTP_${status}`,
         message: Array.isArray(message) ? message.join('; ') : message || '请求失败',
         requestId,
       });
