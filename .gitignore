@@ -1,10 +1,28 @@
 # Dependencies
 node_modules/
 
-# Env & secrets
+# Local Cursor rules (not published)
+.cursor/rules/
+
+# Product docs (keep local)
+docs/
+
+# Env & secrets — never commit real keys, certs, or local env
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_ed25519
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
 
 # Build
 dist/
