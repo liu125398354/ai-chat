@@ -21,7 +21,15 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
+    "deepmerge-ts": "8.0.2",
+    "multer": "2.4.0",
+    "qs": "6.16.0",
     "wait-on": "^8.0.5"
+  },
+  "overrides": {
+    "deepmerge-ts": "$deepmerge-ts",
+    "multer": "$multer",
+    "qs": "$qs"
   },
   "engines": {
     "node": ">=20"
