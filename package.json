@@ -14,9 +14,9 @@
     "build:api": "npm run build -w @ai-chat/api",
     "test": "npm test -w @ai-chat/api && npm test -w @ai-chat/web",
     "lint": "npm run lint -w @ai-chat/web && npm run lint -w @ai-chat/api",
-    "prisma:generate": "prisma generate --schema apps/api/prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema apps/api/prisma/schema.prisma",
-    "prisma:migrate:deploy": "prisma migrate deploy --schema apps/api/prisma/schema.prisma",
+    "prisma:generate": "node node_modules/prisma/build/index.js generate --schema apps/api/prisma/schema.prisma",
+    "prisma:migrate": "node node_modules/prisma/build/index.js migrate dev --schema apps/api/prisma/schema.prisma",
+    "prisma:migrate:deploy": "node node_modules/prisma/build/index.js migrate deploy --schema apps/api/prisma/schema.prisma",
     "prisma:seed": "npm run prisma:seed -w @ai-chat/api"
   },
   "devDependencies": {
