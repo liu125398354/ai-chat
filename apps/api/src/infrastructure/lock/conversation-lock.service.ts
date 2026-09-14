@@ -2,23 +2,44 @@
  * @file conversation-lock.service.ts
  * @author liunannan
  * @date 2026-09-13
- * @description 同一 conversationId 内存锁；抢不到由调用方返回 409
+ * @updated 2026-09-14
+ * @description 会话锁门面：有 REDIS_URL 用 Redis SET NX PX，否则内存 Map
  */
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { loadAppEnv } from '../../config/env';
+import { ConversationLock } from './conversation-lock';
+import { MemoryConversationLock } from './memory-conversation-lock';
+import { RedisConversationLock } from './redis-conversation-lock';
 
 @Injectable()
-export class ConversationLockService {
-  private readonly locks = new Map<string, true>();
+export class ConversationLockService implements ConversationLock, OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ConversationLockService.name);
+  private impl: ConversationLock = new MemoryConversationLock();
+  private redis: RedisConversationLock | null = null;
 
-  tryAcquire(conversationId: string): boolean {
-    if (this.locks.has(conversationId)) {
-      return false;
+  async onModuleInit(): Promise<void> {
+    const env = loadAppEnv();
+    if (!env.redisUrl) {
+      this.logger.log(JSON.stringify({ op: 'conversation_lock', backend: 'memory' }));
+      return;
     }
-    this.locks.set(conversationId, true);
-    return true;
+    const ttlMs = Math.max(env.qianfanTimeoutMs + 5000, 10000);
+    const redis = new RedisConversationLock(env.redisUrl, ttlMs);
+    await redis.connect();
+    this.redis = redis;
+    this.impl = redis;
+    this.logger.log(JSON.stringify({ op: 'conversation_lock', backend: 'redis', ttlMs }));
   }
 
-  release(conversationId: string): void {
-    this.locks.delete(conversationId);
+  async onModuleDestroy(): Promise<void> {
+    await this.redis?.disconnect();
+  }
+
+  tryAcquire(conversationId: string): Promise<boolean> {
+    return this.impl.tryAcquire(conversationId);
+  }
+
+  release(conversationId: string): Promise<void> {
+    return this.impl.release(conversationId);
   }
 }

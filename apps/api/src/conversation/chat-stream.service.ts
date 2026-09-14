@@ -44,7 +44,7 @@ export class ChatStreamService {
     requestId: string,
   ): Promise<void> {
     await this.conversations.assertOwned(userId, conversationId);
-    if (!this.lock.tryAcquire(conversationId)) {
+    if (!(await this.lock.tryAcquire(conversationId))) {
       throw new AppError(
         ERROR_CODES.CONVERSATION_BUSY,
         '请等待当前回复完成',
@@ -204,7 +204,7 @@ export class ChatStreamService {
       }
     } finally {
       disconnect.dispose();
-      this.lock.release(conversationId);
+      await this.lock.release(conversationId);
     }
   }
 

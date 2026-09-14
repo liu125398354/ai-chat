@@ -25,6 +25,7 @@ export type AppEnv = {
   qianfanTimeoutMs: number;
   contextMaxMessages: number;
   corsOrigin: string;
+  redisUrl: string;
 };
 
 /**
@@ -55,5 +56,6 @@ export function loadAppEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
     qianfanTimeoutMs: Number(env.QIANFAN_TIMEOUT_MS) || 120000,
     contextMaxMessages: Number(env.CONTEXT_MAX_MESSAGES) || 20,
     corsOrigin: env.CORS_ORIGIN || 'http://localhost:8080',
+    redisUrl: (env.REDIS_URL || '').trim(),
   };
 }
