@@ -55,6 +55,9 @@ export class ChatStreamService {
     const disconnect = bindClientDisconnect(req, res);
     let sseStarted = false;
     let assembled = '';
+    const startedAt = Date.now();
+    let inputChars = 0;
+    let outcome: 'done' | 'error' | 'aborted' = 'error';
     try {
       const userMessage = await this.prisma.$transaction(async (tx) => {
         const created = await tx.message.create({
@@ -81,14 +84,6 @@ export class ChatStreamService {
         return { created, title: nextTitle || conv?.title || DEFAULT_CONVERSATION_TITLE };
       });
 
-      this.writeSseHeaders(res);
-      sseStarted = true;
-      this.writeEvent(res, SSE_EVENTS.META, {
-        conversationId,
-        userMessageId: userMessage.created.id,
-        title: userMessage.title,
-      });
-
       const env = loadAppEnv();
       const history = await this.prisma.message.findMany({
         where: { conversationId },
@@ -96,13 +91,27 @@ export class ChatStreamService {
         select: { role: true, content: true },
       });
       const turns = toQianfanTurns(history, env.contextMaxMessages);
+      inputChars = turns.reduce((n, turn) => n + turn.content.length, 0);
+      const contextTruncated = history.length > env.contextMaxMessages;
+
+      this.writeSseHeaders(res);
+      sseStarted = true;
+      this.writeEvent(res, SSE_EVENTS.META, {
+        conversationId,
+        userMessageId: userMessage.created.id,
+        title: userMessage.title,
+        contextTruncated,
+      });
+
       this.logger.log(
         JSON.stringify({
           op: 'chat_stream_start',
           conversationId,
           requestId,
           model: env.qianfanModel,
-          turnCount: turns.length,
+          usedTurns: turns.length,
+          totalTurns: history.length,
+          contextTruncated,
         }),
       );
 
@@ -115,6 +124,7 @@ export class ChatStreamService {
       }
 
       if (disconnect.signal.aborted || res.destroyed) {
+        outcome = 'aborted';
         await this.persistAborted(conversationId, assembled, requestId);
         if (!res.writableEnded && !res.destroyed) {
           res.end();
@@ -145,9 +155,11 @@ export class ChatStreamService {
       });
 
       this.writeEvent(res, SSE_EVENTS.DONE, { messageId: assistant.id });
+      outcome = 'done';
       res.end();
     } catch (err) {
       if (isClientAbortError(err) || disconnect.signal.aborted) {
+        outcome = 'aborted';
         await this.persistAborted(conversationId, assembled, requestId);
         if (!res.writableEnded && !res.destroyed) {
           res.end();
@@ -203,6 +215,17 @@ export class ChatStreamService {
         res.end();
       }
     } finally {
+      this.logger.log(
+        JSON.stringify({
+          op: 'chat_stream_metrics',
+          conversationId,
+          requestId,
+          inputChars,
+          outputChars: assembled.length,
+          durationMs: Date.now() - startedAt,
+          outcome,
+        }),
+      );
       disconnect.dispose();
       await this.lock.release(conversationId);
     }

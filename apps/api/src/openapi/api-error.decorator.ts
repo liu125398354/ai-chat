@@ -14,6 +14,7 @@ const STATUS_HINT: Record<number, string> = {
   403: 'AUTH_EXPIRED',
   404: 'CONVERSATION_NOT_FOUND（含无归属）',
   409: 'CONVERSATION_BUSY',
+  429: 'AUTH_RATE_LIMITED',
   500: 'INTERNAL_ERROR',
 };
 

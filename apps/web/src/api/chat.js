@@ -2,8 +2,11 @@
  * @file chat.js
  * @author liunannan
  * @date 2026-09-13
+ * @updated 2026-09-14
  * @description SSE 流式发送：必须 fetch + Bearer，禁止 EventSource
  */
+import { ERROR_CODES } from '@ai-chat/shared';
+import { expireClientSession, isAuthSessionCode } from '@/utils/session-expire';
 
 /**
  * POST 流式对话并解析 SSE 事件。
@@ -26,11 +29,14 @@ export async function streamMessages(conversationId, body, signal, onEvent) {
   });
 
   if (!res.ok) {
-    let payload = { code: 'INTERNAL_ERROR', message: '发送失败' };
+    let payload = { code: ERROR_CODES.INTERNAL_ERROR, message: '发送失败' };
     try {
       payload = await res.json();
     } catch {
       /* 非 JSON 错误体 */
+    }
+    if (res.status === 401 || res.status === 403 || isAuthSessionCode(payload.code)) {
+      await expireClientSession();
     }
     const err = new Error(payload.message || '发送失败');
     err.code = payload.code;

@@ -1,11 +1,11 @@
 /**
- * @file index.js
+ * @file index.mjs
  * @author liunannan
- * @date 2026-09-13
- * @description 前后端共用错误码与 SSE 事件名（纯 JS，非 TS-only）
+ * @date 2026-09-14
+ * @description ESM 导出，供 Vite；内容与 index.js 保持一致
  */
 
-const ERROR_CODES = Object.freeze({
+export const ERROR_CODES = Object.freeze({
   AUTH_INVALID: 'AUTH_INVALID',
   AUTH_REQUIRED: 'AUTH_REQUIRED',
   AUTH_EXPIRED: 'AUTH_EXPIRED',
@@ -25,18 +25,11 @@ const ERROR_CODES = Object.freeze({
   NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
 });
 
-const SSE_EVENTS = Object.freeze({
+export const SSE_EVENTS = Object.freeze({
   META: 'meta',
   DELTA: 'delta',
   DONE: 'done',
   ERROR: 'error',
 });
 
-/** 发给千帆的最近消息条数默认上限；与 API CONTEXT_MAX_MESSAGES 默认值对齐。 */
-const CONTEXT_MAX_MESSAGES = 20;
-
-module.exports = {
-  ERROR_CODES,
-  SSE_EVENTS,
-  CONTEXT_MAX_MESSAGES,
-};
+export const CONTEXT_MAX_MESSAGES = 20;

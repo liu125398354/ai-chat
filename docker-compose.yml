@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_chat
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_chat?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      QIANFAN_ACCESS_KEY: ${QIANFAN_ACCESS_KEY}
+      QIANFAN_SECRET_KEY: ${QIANFAN_SECRET_KEY}
+      QIANFAN_MODEL: ${QIANFAN_MODEL:-ernie-4.0-8k}
+      QIANFAN_TIMEOUT_MS: ${QIANFAN_TIMEOUT_MS:-120000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      REDIS_URL: redis://redis:6379
+      ENABLE_OPENAPI: ${ENABLE_OPENAPI:-false}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+    ports:
+      - "3000:3000"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:

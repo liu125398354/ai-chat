@@ -2,13 +2,13 @@
   @file MarkdownView.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-13
-  @description 助手 Markdown：KaTeX 公式 + GitHub 风格 + 代码复制；消毒后 v-html
+  @updated 2026-09-14
+  @description 助手 Markdown：KaTeX 公式 + GitHub 风格 + 代码复制；流式跳过 KaTeX
 -->
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import DOMPurify from 'dompurify';
-import { markdown as md } from '@/utils/markdown';
+import { markdown as md, markdownLive } from '@/utils/markdown';
 import { copyText } from '@/utils/clipboard';
 import 'katex/dist/katex.min.css';
 import 'github-markdown-css/github-markdown-light.css';
@@ -104,7 +104,8 @@ function withLiveCaret(html) {
 
 const html = computed(() => {
   ensureKatexPurifyHook();
-  const sanitized = DOMPurify.sanitize(md.render(displaySource.value || ''), {
+  const engine = props.live ? markdownLive : md;
+  const sanitized = DOMPurify.sanitize(engine.render(displaySource.value || ''), {
     USE_PROFILES: { html: true, mathMl: true },
     ADD_ATTR: ['class', 'style', 'aria-hidden', 'aria-label', 'type', 'encoding'],
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form'],

@@ -45,7 +45,7 @@ export class AuthController {
     description: 'password 为 RSA-OAEP 密文。失败统一 401 AUTH_INVALID，不区分用户是否存在。',
   })
   @ApiOkResponse({ type: LoginResponseDto })
-  @ApiErrorResponses(400, 401)
+  @ApiErrorResponses(400, 401, 429)
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto.username, dto.password);
   }
@@ -60,7 +60,7 @@ export class AuthController {
     description: 'password 为 RSA-OAEP 密文。明文须 8–128 字符。冲突返回 AUTH_USERNAME_TAKEN。',
   })
   @ApiCreatedResponse({ type: LoginResponseDto })
-  @ApiErrorResponses(400)
+  @ApiErrorResponses(400, 429)
   register(@Body() dto: LoginDto) {
     return this.auth.register(dto.username, dto.password);
   }

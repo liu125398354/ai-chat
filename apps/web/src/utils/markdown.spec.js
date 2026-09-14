@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { markdown, wrapBareMathEnvs } from './markdown.js';
+import { markdown, wrapBareMathEnvs, markdownLive } from './markdown.js';
 
 function render(src) {
   return markdown.render(src);
@@ -55,5 +55,12 @@ describe('math rendering', () => {
   it('renders \\[ \\] derivative', () => {
     const html = render('求导：\\[ \\frac{d}{dx} f(x) \\]');
     assert.match(html, /katex/);
+  });
+});
+
+describe('live markdown', () => {
+  it('skips KaTeX while streaming', () => {
+    const html = markdownLive.render('指数 $$x^{n+1}$$');
+    assert.doesNotMatch(html, /katex/);
   });
 });

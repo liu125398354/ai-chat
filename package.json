@@ -7,12 +7,20 @@
     "packages/shared"
   ],
   "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"wait-on tcp:127.0.0.1:3000 && npm run dev:web\"",
     "dev:web": "npm run dev -w @ai-chat/web",
     "dev:api": "npm run start:dev -w @ai-chat/api",
     "build:web": "npm run build -w @ai-chat/web",
     "build:api": "npm run build -w @ai-chat/api",
+    "test": "npm test -w @ai-chat/api && npm test -w @ai-chat/web",
+    "lint": "npm run lint -w @ai-chat/web && npm run lint -w @ai-chat/api",
     "prisma:generate": "npm run prisma:generate -w @ai-chat/api",
-    "prisma:migrate": "npm run prisma:migrate -w @ai-chat/api"
+    "prisma:migrate": "npm run prisma:migrate -w @ai-chat/api",
+    "prisma:seed": "npm run prisma:seed -w @ai-chat/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "wait-on": "^8.0.5"
   },
   "engines": {
     "node": ">=20"

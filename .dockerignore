@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.github
+.cursor
+coverage
+*.log
+.env
+.env.*
+!.env.example
+docs
+**/*.spec.ts
+**/*.spec.js

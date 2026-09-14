@@ -12,8 +12,13 @@ export function createAppLogger(): Logger {
     redact: {
       paths: [
         'password',
+        'oldPassword',
+        'newPassword',
         'token',
         'authorization',
+        '*.authorization',
+        'content',
+        '*.content',
         'JWT_SECRET',
         'QIANFAN_ACCESS_KEY',
         'QIANFAN_SECRET_KEY',

@@ -79,14 +79,16 @@ export function wrapBareMathEnvs(src) {
   });
 }
 
-export function createMarkdown() {
+export function createMarkdown(options = {}) {
   const md = new MarkdownIt({
     html: false,
     linkify: true,
     breaks: true,
     typographer: false,
   });
-  md.use(markdownItKatex);
+  if (options.katex !== false) {
+    md.use(markdownItKatex);
+  }
   md.renderer.rules.fence = renderFence(md);
   const orig = md.render.bind(md);
   md.render = (src, env) => orig(wrapBareMathEnvs(src || ''), env);
@@ -94,3 +96,5 @@ export function createMarkdown() {
 }
 
 export const markdown = createMarkdown();
+/** 流式预览：跳过 KaTeX，降低未闭合 $$ / 围栏时的 CPU。 */
+export const markdownLive = createMarkdown({ katex: false });

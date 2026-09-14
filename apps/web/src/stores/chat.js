@@ -7,6 +7,7 @@
  */
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { ERROR_CODES } from '@ai-chat/shared';
 import { listMessages } from '@/api/conversations';
 import { streamMessages } from '@/api/chat';
 import { useConversationsStore } from '@/stores/conversations';
@@ -155,7 +156,7 @@ export const useChatStore = defineStore('chat', () => {
           }
           if (event === 'error') {
             tempAsst.status = 'failed';
-            tempAsst.errorCode = data.code || 'QIANFAN_ERROR';
+            tempAsst.errorCode = data.code || ERROR_CODES.QIANFAN_ERROR;
             error.value = data.message || '生成失败';
           }
         },
@@ -170,13 +171,36 @@ export const useChatStore = defineStore('chat', () => {
         return;
       }
       tempAsst.status = 'failed';
-      tempAsst.errorCode = err.code || 'INTERNAL_ERROR';
+      tempAsst.errorCode = err.code || ERROR_CODES.INTERNAL_ERROR;
       error.value = err.message || '发送失败';
     } finally {
       if (streamConversationId.value === targetId) {
         generating.value = false;
         streamConversationId.value = '';
         abortController = null;
+      }
+    }
+    if (!error.value && useConversationsStore().currentId === targetId) {
+      await reconcile(conversationId);
+    }
+  }
+
+  /** done 后静默拉一页消息，校准临时 id / 半包。 */
+  async function reconcile(conversationId) {
+    try {
+      const data = await listMessages(conversationId, { limit: MESSAGE_PAGE_SIZE });
+      if (useConversationsStore().currentId !== conversationId) {
+        return;
+      }
+      if (generating.value && streamConversationId.value === conversationId) {
+        return;
+      }
+      messages.value = data.items || [];
+      olderCursor = data.nextCursor || null;
+      hasOlder.value = Boolean(olderCursor);
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn('reconcile messages failed', err);
       }
     }
   }

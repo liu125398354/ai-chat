@@ -24,7 +24,11 @@ async function bootstrap(): Promise<void> {
     }),
   );
   app.useGlobalFilters(new HttpExceptionFilter());
-  setupOpenApi(app);
+  if (env.enableOpenApi) {
+    setupOpenApi(app);
+  } else {
+    Logger.log('OpenAPI /docs disabled (set ENABLE_OPENAPI=true to enable)', 'Bootstrap');
+  }
   await app.listen(env.port);
   Logger.log(`API listening on ${env.port} (qianfan model: ${env.qianfanModel})`, 'Bootstrap');
 }
