@@ -2,38 +2,51 @@
   @file NightSky.vue
   @author liunannan
   @date 2026-09-14
-  @description 登录/合规页夜空底：柔和暮色带 + 星座细线 + 近处网格，无粒子动画
+  @updated 2026-09-14
+  @description 夜空底：柔和暮色带 + 星座细线 + 近处网格；渐变 id 按实例隔离
 -->
+<script setup>
+import { useId } from 'vue';
+
+const nid = String(useId() || 'ns').replace(/[^a-zA-Z0-9_-]/g, '');
+const ids = {
+  sky: `ns-sky-${nid}`,
+  brand: `ns-brand-${nid}`,
+  dusk: `ns-dusk-${nid}`,
+  grid: `ns-grid-${nid}`,
+};
+</script>
+
 <template>
   <div class="night-sky" aria-hidden="true">
     <svg class="sky" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
       <defs>
-        <linearGradient id="sky-fill" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient :id="ids.sky" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#0a0c18" />
           <stop offset="42%" stop-color="#121428" />
           <stop offset="62%" stop-color="#1a2248" />
           <stop offset="78%" stop-color="#3a2a4a" />
           <stop offset="100%" stop-color="#121428" />
         </linearGradient>
-        <radialGradient id="bloom-brand" cx="22%" cy="28%" r="45%">
+        <radialGradient :id="ids.brand" cx="22%" cy="28%" r="45%">
           <stop offset="0%" stop-color="#3b5bdb" stop-opacity="0.28" />
           <stop offset="55%" stop-color="#3b5bdb" stop-opacity="0.06" />
           <stop offset="100%" stop-color="#3b5bdb" stop-opacity="0" />
         </radialGradient>
-        <radialGradient id="bloom-dusk" cx="50%" cy="58%" r="38%">
+        <radialGradient :id="ids.dusk" cx="50%" cy="58%" r="38%">
           <stop offset="0%" stop-color="#ff8a6b" stop-opacity="0.22" />
           <stop offset="50%" stop-color="#ff8a6b" stop-opacity="0.06" />
           <stop offset="100%" stop-color="#ff8a6b" stop-opacity="0" />
         </radialGradient>
-        <linearGradient id="grid-fade" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient :id="ids.grid" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#7ee0ff" stop-opacity="0" />
           <stop offset="25%" stop-color="#7ee0ff" stop-opacity="0.12" />
           <stop offset="100%" stop-color="#7ee0ff" stop-opacity="0" />
         </linearGradient>
       </defs>
-      <rect width="1440" height="900" fill="url(#sky-fill)" />
-      <rect width="1440" height="900" fill="url(#bloom-brand)" />
-      <rect width="1440" height="900" fill="url(#bloom-dusk)" />
+      <rect width="1440" height="900" :fill="`url(#${ids.sky})`" />
+      <rect width="1440" height="900" :fill="`url(#${ids.brand})`" />
+      <rect width="1440" height="900" :fill="`url(#${ids.dusk})`" />
 
       <g stroke="#d7dcf0" stroke-width="0.7" fill="none" opacity="0.28">
         <path d="M180 140 L260 210 L210 280 L320 250 L390 180" />
@@ -64,7 +77,7 @@
 
       <ellipse cx="720" cy="530" rx="720" ry="36" fill="#ff8a6b" opacity="0.18" />
 
-      <g stroke="url(#grid-fade)" stroke-width="1" fill="none">
+      <g :stroke="`url(#${ids.grid})`" stroke-width="1" fill="none">
         <path d="M0 620 L1440 620" />
         <path d="M0 670 L1440 670" opacity="0.85" />
         <path d="M0 730 L1440 730" opacity="0.7" />

@@ -20,7 +20,7 @@
   position: relative;
   width: 48px;
   height: 32px;
-  border: 1px solid var(--color-line-strong);
+  border: 1px solid var(--empty-line, var(--color-line-strong));
   border-radius: 2px;
 }
 .empty-box::before,

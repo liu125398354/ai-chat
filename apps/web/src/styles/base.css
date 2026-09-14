@@ -2,7 +2,7 @@
  * @file base.css
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-13
+ * @updated 2026-09-14
  * @description 夜窗主题 token、视口锁高、细滚动条与克制动效
  */
 :root {
@@ -105,15 +105,15 @@ textarea {
 }
 
 .night-rail-drawer .ant-drawer-header {
-  background: var(--color-rail);
-  border-bottom: 1px solid var(--color-rail-active);
+  background: rgba(12, 14, 28, 0.9);
+  border-bottom: 1px solid rgba(90, 110, 180, 0.28);
 }
 .night-rail-drawer .ant-drawer-title,
 .night-rail-drawer .ant-drawer-close {
   color: var(--color-rail-text);
 }
 .night-rail-drawer .ant-drawer-content {
-  background: var(--color-rail);
+  background: rgba(12, 14, 28, 0.82);
 }
 
 @media (prefers-reduced-motion: reduce) {

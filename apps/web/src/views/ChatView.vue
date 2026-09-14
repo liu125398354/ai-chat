@@ -3,7 +3,7 @@
   @author liunannan
   @date 2026-09-13
   @updated 2026-09-14
-  @description 工作台：固定侧栏滚动列表 + 消息区内滚动 + 流式展示；生成可停止
+  @description 工作台：夜空底与登录页同系；侧栏半透、气泡/输入条实底保证对比
 -->
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -11,6 +11,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { CopyOutlined, MenuOutlined, PauseOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons-vue';
 import { message as antdMessage, Modal } from 'ant-design-vue';
 import BrandMark from '@/components/BrandMark.vue';
+import NightSky from '@/components/NightSky.vue';
 import MarkdownView from '@/components/MarkdownView.vue';
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue';
 import ConversationSidebar from '@/components/ConversationSidebar.vue';
@@ -359,6 +360,8 @@ function onKeydown(e) {
 </script>
 
 <template>
+  <div class="workbench-shell">
+    <NightSky />
   <a-layout class="workbench">
     <a-layout-sider
       v-if="!isMobile"
@@ -393,7 +396,7 @@ function onKeydown(e) {
       placement="left"
       :width="280"
       rootClassName="night-rail-drawer"
-      :body-style="{ padding: 0, height: 'calc(100% - 55px)', background: 'var(--color-rail)' }"
+      :body-style="{ padding: 0, height: 'calc(100% - 55px)', background: 'transparent' }"
     >
       <ConversationSidebar
         :items="conversations.items"
@@ -423,7 +426,7 @@ function onKeydown(e) {
         <BrandMark :size="20" />
         <span>AI Chat</span>
       </a-layout-header>
-      <div ref="messagesEl" class="messages thin-scroll" @scroll="onMessagesScroll">
+      <div ref="messagesEl" class="messages thin-scroll thin-scroll-dark" @scroll="onMessagesScroll">
         <div v-if="chat.messages.length" class="thread-bar">
           <button type="button" class="copy-btn" @click="copyThread">
             <CopyOutlined />
@@ -517,17 +520,27 @@ function onKeydown(e) {
     </a-layout>
   </a-layout>
   <ChangePasswordModal v-model:open="passwordOpen" />
+  </div>
 </template>
 
 <style scoped>
-.workbench {
+.workbench-shell {
+  position: relative;
   height: 100%;
   overflow: hidden;
+  background: var(--color-rail);
+}
+.workbench {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  overflow: hidden;
+  background: transparent !important;
 }
 .sidebar {
-  background: var(--color-rail) !important;
+  background: transparent !important;
   overflow: hidden;
-  border-inline-end: 1px solid var(--color-rail-active) !important;
+  border-inline-end: 1px solid rgba(90, 110, 180, 0.28) !important;
 }
 .sidebar :deep(.ant-layout-sider-children) {
   height: 100%;
@@ -538,7 +551,7 @@ function onKeydown(e) {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--color-paper);
+  background: transparent !important;
   overflow: hidden;
 }
 .mobile-bar {
@@ -547,16 +560,34 @@ function onKeydown(e) {
   gap: 8px;
   height: 48px;
   padding: 0 8px;
-  background: var(--color-paper-raised);
+  background: rgba(12, 14, 28, 0.78);
+  color: var(--color-rail-text);
   line-height: 48px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--color-line);
+  border-bottom: 1px solid rgba(90, 110, 180, 0.28);
+}
+.mobile-bar :deep(.ant-btn) {
+  color: var(--color-rail-text);
 }
 .messages {
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: 24px 32px;
+  --empty-line: rgba(215, 220, 240, 0.55);
+}
+.messages :deep(.ant-empty-description) {
+  color: var(--color-rail-text);
+}
+.messages :deep(.ant-skeleton.ant-skeleton-active .ant-skeleton-title),
+.messages :deep(.ant-skeleton.ant-skeleton-active .ant-skeleton-paragraph > li) {
+  background: linear-gradient(
+    90deg,
+    rgba(232, 237, 255, 0.14) 25%,
+    rgba(215, 220, 240, 0.28) 37%,
+    rgba(232, 237, 255, 0.14) 63%
+  );
+  background-size: 400% 100%;
 }
 .thread-bar {
   display: flex;
@@ -570,11 +601,12 @@ function onKeydown(e) {
   border: 1px solid var(--color-line-strong);
   border-radius: 4px;
   background: var(--color-paper-raised);
-  color: var(--color-ink-muted);
+  color: var(--color-ink);
   font-size: 12px;
   line-height: 1;
   padding: 4px 8px;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(12, 14, 28, 0.22);
 }
 .copy-btn:hover {
   background: var(--color-brand-soft);
@@ -620,11 +652,14 @@ function onKeydown(e) {
 .msg.user .bubble {
   background: var(--color-brand);
   color: #fff;
+  box-shadow: 0 4px 14px rgba(12, 14, 28, 0.28);
 }
 .msg.assistant .bubble {
   align-self: flex-start;
   background: var(--color-paper-raised);
+  color: var(--color-ink);
   border: 1px solid var(--color-line);
+  box-shadow: 0 4px 16px rgba(12, 14, 28, 0.2);
 }
 .msg-copy {
   flex-shrink: 0;
@@ -639,9 +674,10 @@ function onKeydown(e) {
   flex-direction: column;
   gap: 12px;
   padding: 16px 32px 24px;
-  border-top: 1px solid var(--color-line);
-  background: var(--color-paper-raised);
+  border-top: 1px solid rgba(213, 220, 236, 0.85);
+  background: rgba(251, 252, 255, 0.96);
   flex-shrink: 0;
+  box-shadow: 0 -10px 28px rgba(12, 14, 28, 0.22);
 }
 .context-hint {
   margin: 0;
@@ -673,12 +709,16 @@ function onKeydown(e) {
   border: 1px solid var(--color-line-strong);
   border-radius: 8px;
   background: #fff;
+  color: var(--color-ink);
   outline: none;
   transition: border-color 160ms var(--ease-tech), box-shadow 160ms var(--ease-tech);
 }
 .composer textarea:focus {
   border-color: var(--color-brand);
   box-shadow: inset 0 0 0 1px var(--color-brand);
+}
+.composer textarea::placeholder {
+  color: var(--color-ink-muted);
 }
 .composer :deep(.ant-btn-primary:disabled) {
   opacity: 0.45;

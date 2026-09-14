@@ -270,7 +270,8 @@ function onMenuClick({ key }, item) {
   min-height: 0;
   padding: 16px 12px;
   color: var(--color-rail-text);
-  background: var(--color-rail);
+  background: linear-gradient(180deg, rgba(10, 12, 24, 0.55) 0%, rgba(18, 20, 40, 0.42) 100%);
+  --empty-line: rgba(215, 220, 240, 0.5);
 }
 .side::before {
   content: "";
@@ -347,9 +348,9 @@ function onMenuClick({ key }, item) {
   position: relative;
   width: 100%;
   padding: 6px 8px 6px 28px;
-  border: 1px solid var(--color-rail-active);
+  border: 1px solid rgba(90, 110, 180, 0.35);
   border-radius: 6px;
-  background: var(--color-rail-inset);
+  background: rgba(12, 14, 28, 0.72);
   color: var(--color-rail-text);
   outline: none;
 }
@@ -357,7 +358,7 @@ function onMenuClick({ key }, item) {
   border-color: var(--color-brand);
 }
 .search::placeholder {
-  color: var(--color-ink-muted);
+  color: rgba(215, 220, 240, 0.48);
 }
 .side-foot {
   position: relative;
@@ -368,8 +369,8 @@ function onMenuClick({ key }, item) {
   gap: 8px;
   margin: 12px -12px -16px;
   padding: 14px 16px 16px;
-  border-top: 1px solid var(--color-rail-active);
-  background: var(--color-rail-inset);
+  border-top: 1px solid rgba(90, 110, 180, 0.28);
+  background: rgba(12, 14, 28, 0.72);
   font-size: 13px;
 }
 .side :deep(.ant-empty-description) {
@@ -445,10 +446,10 @@ function onMenuClick({ key }, item) {
   pointer-events: none;
 }
 .conv-list li.active {
-  background: var(--color-rail-active);
+  background: rgba(59, 91, 219, 0.32);
 }
 .conv-list li:hover:not(.active) {
-  background: var(--color-rail-hover);
+  background: rgba(28, 32, 64, 0.55);
 }
 .active-bar {
   position: absolute;
@@ -503,7 +504,7 @@ function onMenuClick({ key }, item) {
   pointer-events: auto;
 }
 .more-btn:hover {
-  background: var(--color-rail-inset);
+  background: rgba(12, 14, 28, 0.55);
 }
 .rename-input {
   flex: 1;
@@ -511,7 +512,7 @@ function onMenuClick({ key }, item) {
   padding: 6px 8px;
   border: 1px solid var(--color-brand);
   border-radius: 6px;
-  background: var(--color-rail-inset);
+  background: rgba(12, 14, 28, 0.78);
   color: var(--color-rail-text);
   outline: none;
 }
