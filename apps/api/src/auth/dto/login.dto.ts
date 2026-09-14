@@ -2,7 +2,7 @@
  * @file login.dto.ts
  * @author liunannan
  * @date 2026-09-13
- * @description 登录入参；password 为 RSA-OAEP 密文
+ * @description 登录/注册入参；password 为 RSA-OAEP 密文
  */
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
