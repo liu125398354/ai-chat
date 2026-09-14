@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npx vite",
-    "build": "npx vue-tsc --noEmit -p tsconfig.json && npx vite build",
-    "preview": "npx vite preview",
-    "test": "npx tsx --test src/utils/markdown.spec.ts",
-    "lint": "npx eslint src"
+    "dev": "vite",
+    "build": "vue-tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "test": "tsx --test src/utils/markdown.spec.ts",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@ai-chat/shared": "*",
