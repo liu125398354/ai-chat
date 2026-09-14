@@ -44,14 +44,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
+          registry-url: https://registry.npmjs.org
 
       - name: Install
         env:
           NODE_ENV: development
-          npm_config_registry: https://registry.npmjs.org/
-          npm_config_replace_registry_host: always
         run: npm ci --include=dev
 
       - name: Generate Prisma client
