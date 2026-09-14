@@ -5,21 +5,92 @@ on:
     branches: [main, master]
   pull_request:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
+      # 与 docker-compose 一致；Actions 服务容器映射到作业主机 localhost
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_chat?schema=public
+      # 仅满足启动校验，不调用千帆；禁止把真实 AK/SK 写进 workflow
+      JWT_SECRET: ci-only-jwt-secret-min16
+      QIANFAN_ACCESS_KEY: ci-dummy-ak
+      QIANFAN_SECRET_KEY: ci-dummy-sk
+      CORS_ORIGIN: http://localhost:8080
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_chat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ai_chat"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run prisma:generate
-      - run: npm test
-      - run: npm run lint
-      - run: npm run build:web
-      - run: npm run build:api
-      - run: npm audit --audit-level=high
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Apply migrations
+        run: npm run prisma:migrate:deploy
+
+      - name: Test
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build web
+        run: npm run build:web
+
+      - name: Build api
+        run: npm run build:api
+
+      - name: Smoke health/ready against Postgres
+        working-directory: apps/api
+        env:
+          NODE_ENV: production
+          PORT: 3000
+        run: |
+          set -euo pipefail
+          node dist/main.js &
+          pid=$!
+          cleanup() { kill "$pid" 2>/dev/null || true; }
+          trap cleanup EXIT
+          for _ in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:3000/health/ready >/dev/null; then
+              curl -sf http://127.0.0.1:3000/health/live
+              echo
+              curl -sf http://127.0.0.1:3000/health/ready
+              echo
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API did not become ready on /health/ready"
+          exit 1
+
+      - name: Audit high+
+        run: npm audit --audit-level=high --registry=https://registry.npmjs.org
