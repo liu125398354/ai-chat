@@ -50,6 +50,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # npm workspaces 把 CLI 提升到根 node_modules/.bin；Linux 上 workspace 脚本默认 PATH 不含该目录
+      - name: Expose hoisted binaries
+        run: echo "${GITHUB_WORKSPACE}/node_modules/.bin" >> "$GITHUB_PATH"
+
       - name: Generate Prisma client
         run: npm run prisma:generate
 
