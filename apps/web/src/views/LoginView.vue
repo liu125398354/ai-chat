@@ -6,12 +6,15 @@
   @description 登录/注册页：同一套 RSA 加密提交；夜空底与品牌标
 -->
 <script setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { LockOutlined, LoginOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons-vue';
 import BrandMark from '@/components/BrandMark.vue';
 import NightSky from '@/components/NightSky.vue';
 import { useAuthStore } from '@/stores/auth';
+import { registerLoginAntd } from '@/plugins/antd-login';
+
+registerLoginAntd(getCurrentInstance()?.appContext.app);
 
 const form = reactive({
   username: '',
@@ -76,6 +79,20 @@ function toggleMode() {
     query: route.query.redirect ? { redirect: route.query.redirect } : undefined,
   });
 }
+
+/** 填表时空闲预取工作台；Markdown 栈随 ChatView 静态依赖一并拉取。 */
+function prefetchChatWorkbench() {
+  import('@/views/ChatView.vue');
+}
+
+onMounted(() => {
+  const ric = window.requestIdleCallback;
+  if (typeof ric === 'function') {
+    ric(prefetchChatWorkbench, { timeout: 2500 });
+  } else {
+    window.setTimeout(prefetchChatWorkbench, 400);
+  }
+});
 </script>
 
 <template>

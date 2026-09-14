@@ -6,7 +6,7 @@
   @description 工作台：夜空底与登录页同系；侧栏半透、气泡/输入条实底保证对比
 -->
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { CopyOutlined, MenuOutlined, PauseOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons-vue';
 import { message as antdMessage, Modal } from 'ant-design-vue';
@@ -16,6 +16,7 @@ import MarkdownView from '@/components/MarkdownView.vue';
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue';
 import ConversationSidebar from '@/components/ConversationSidebar.vue';
 import EmptyFrame from '@/components/EmptyFrame.vue';
+import { registerWorkbenchAntd } from '@/plugins/antd-workbench';
 import { useAuthStore } from '@/stores/auth';
 import { useChatStore } from '@/stores/chat';
 import { useConversationsStore } from '@/stores/conversations';
@@ -23,6 +24,8 @@ import { copyText } from '@/utils/clipboard';
 import { titleFromUserContent } from '@/utils/conversation-title';
 import { CONTEXT_MAX_MESSAGES } from '@/utils/context-window';
 import { readLastConversation, writeLastConversation } from '@/utils/last-conversation';
+
+registerWorkbenchAntd(getCurrentInstance()?.appContext.app);
 
 const auth = useAuthStore();
 const conversations = useConversationsStore();
