@@ -2,8 +2,8 @@
  * @file conversation.controller.ts
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-13
- * @description 会话与消息 HTTP/SSE；userId 只来自 JWT
+ * @updated 2026-09-14
+ * @description 会话与消息 HTTP/SSE；userId 只来自 JWT；列表 keyset 分页
  */
 import {
   Body,
@@ -15,6 +15,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -41,6 +42,8 @@ import {
 import { ChatStreamService } from './chat-stream.service';
 import { ConversationService } from './conversation.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
+import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
+import { ListMessagesQueryDto } from './dto/list-messages-query.dto';
 import { StreamMessageDto } from './dto/stream-message.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
@@ -56,12 +59,14 @@ export class ConversationController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: '会话列表', description: '当前用户，updatedAt 降序；不含 messages' })
+  @ApiOperation({
+    summary: '会话列表',
+    description: '当前用户，updatedAt+id 降序 keyset；不含 messages。q 仅搜 title。',
+  })
   @ApiOkResponse({ type: ConversationListDto })
-  @ApiErrorResponses(401, 403)
-  async list(@Req() req: Request) {
-    const items = await this.conversations.list(req.user!.userId);
-    return { items };
+  @ApiErrorResponses(400, 401, 403)
+  async list(@Req() req: Request, @Query() query: ListConversationsQueryDto) {
+    return this.conversations.list(req.user!.userId, query);
   }
 
   @Post()
@@ -97,13 +102,19 @@ export class ConversationController {
   }
 
   @Get(':id/messages')
-  @ApiOperation({ summary: '消息历史', description: '正序 createdAt 升序' })
+  @ApiOperation({
+    summary: '消息历史',
+    description: '无 cursor 返回最近一页（正序）；cursor 再取更早消息。',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: MessageListDto })
-  @ApiErrorResponses(401, 403, 404)
-  async messages(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
-    const items = await this.conversations.listMessages(req.user!.userId, id);
-    return { items };
+  @ApiErrorResponses(400, 401, 403, 404)
+  async messages(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ListMessagesQueryDto,
+  ) {
+    return this.conversations.listMessages(req.user!.userId, id, query);
   }
 
   /**

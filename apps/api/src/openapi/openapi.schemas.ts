@@ -18,7 +18,7 @@ export class ErrorBodyDto {
 }
 
 export class PublicKeyResponseDto {
-  @ApiProperty({ description: 'RSA 公钥 PEM，登录/改密前先拉取' })
+  @ApiProperty({ description: 'RSA 公钥 PEM，登录/注册/改密前先拉取' })
   publicKey!: string;
 }
 
@@ -63,6 +63,9 @@ export class ConversationDto {
 export class ConversationListDto {
   @ApiProperty({ type: [ConversationDto] })
   items!: ConversationDto[];
+
+  @ApiPropertyOptional({ nullable: true, description: '下一页 keyset 游标；无更多则为 null' })
+  nextCursor!: string | null;
 }
 
 export class MessageDto {
@@ -91,4 +94,7 @@ export class MessageDto {
 export class MessageListDto {
   @ApiProperty({ type: [MessageDto] })
   items!: MessageDto[];
+
+  @ApiPropertyOptional({ nullable: true, description: '更早消息的 keyset 游标；无更多则为 null' })
+  nextCursor!: string | null;
 }
