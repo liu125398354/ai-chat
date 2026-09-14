@@ -109,6 +109,18 @@ export const useConversationsStore = defineStore('conversations', () => {
     currentId.value = id;
   }
 
+  /** 当前用户是否仍拥有该会话；首屏列表未覆盖时再探消息接口。 */
+  async function isOwned(id) {
+    if (!id) return false;
+    if (items.value.some((row) => row.id === id)) return true;
+    try {
+      await convApi.listMessages(id, { limit: 1 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** 换户 / 登出时丢弃列表与当前选中，避免串台。 */
   function reset() {
     items.value = [];
@@ -136,6 +148,7 @@ export const useConversationsStore = defineStore('conversations', () => {
     touch,
     isDefaultTitle,
     select,
+    isOwned,
     reset,
   };
 });

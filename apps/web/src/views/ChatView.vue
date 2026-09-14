@@ -20,6 +20,7 @@ import { useConversationsStore } from '@/stores/conversations';
 import { copyText } from '@/utils/clipboard';
 import { titleFromUserContent } from '@/utils/conversation-title';
 import { CONTEXT_MAX_MESSAGES } from '@/utils/context-window';
+import { readLastConversation, writeLastConversation } from '@/utils/last-conversation';
 
 const auth = useAuthStore();
 const conversations = useConversationsStore();
@@ -76,12 +77,11 @@ onMounted(async () => {
   syncViewport();
   media.addEventListener('change', syncViewport);
   await conversations.fetchList();
-  const fromQuery = typeof route.query.c === 'string' ? route.query.c : '';
-  const owned = fromQuery && conversations.items.some((row) => row.id === fromQuery);
-  const nextId = owned ? fromQuery : conversations.items[0]?.id || '';
+  const nextId = await resolveResumeId();
   if (nextId === conversations.currentId) {
     if (nextId) {
       await chat.load(nextId);
+      writeLastConversation(auth.user?.id, nextId);
     } else {
       chat.clear();
     }
@@ -89,6 +89,19 @@ onMounted(async () => {
   }
   conversations.select(nextId);
 });
+
+/** 优先 URL，其次该用户上次选中；已删除或不属于自己则回退列表最近一项。 */
+async function resolveResumeId() {
+  const fromQuery = typeof route.query.c === 'string' ? route.query.c : '';
+  const remembered = readLastConversation(auth.user?.id);
+  if (fromQuery && (await conversations.isOwned(fromQuery))) {
+    return fromQuery;
+  }
+  if (remembered && (await conversations.isOwned(remembered))) {
+    return remembered;
+  }
+  return conversations.items[0]?.id || '';
+}
 
 onUnmounted(() => {
   media?.removeEventListener('change', syncViewport);
@@ -99,6 +112,9 @@ watch(
   () => conversations.currentId,
   async (id, prev) => {
     if (id === prev) return;
+    if (id && auth.user?.id) {
+      writeLastConversation(auth.user.id, id);
+    }
     drawerOpen.value = false;
     enteringIds.value = {};
     if (!id) {
