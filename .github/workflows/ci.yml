@@ -48,11 +48,11 @@ jobs:
           cache: npm
 
       - name: Install
-        run: npm ci
-
-      # workspace 脚本在 Linux 上找不到提升到根目录的 nest/eslint/vite；禁止用裸 npx（会下载最新 Prisma 7）
-      - name: Expose hoisted binaries
-        run: echo "${GITHUB_WORKSPACE}/node_modules/.bin" >> "$GITHUB_PATH"
+        env:
+          NODE_ENV: development
+          npm_config_registry: https://registry.npmjs.org/
+          npm_config_replace_registry_host: always
+        run: npm ci --include=dev
 
       - name: Generate Prisma client
         run: npm run prisma:generate

@@ -10,7 +10,7 @@ RUN npm ci --workspace=@ai-chat/api --include-workspace-root
 FROM deps AS build
 COPY apps/api apps/api
 WORKDIR /app/apps/api
-RUN node ../../node_modules/prisma/build/index.js generate && npm run build
+RUN node scripts/run-prisma.cjs generate && npm run build
 
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
@@ -22,6 +22,6 @@ COPY --from=deps /app/packages /app/packages
 COPY --from=build /app/apps/api/dist /app/apps/api/dist
 COPY --from=build /app/apps/api/prisma /app/apps/api/prisma
 WORKDIR /app/apps/api
-RUN node ../../node_modules/prisma/build/index.js generate
+RUN node scripts/run-prisma.cjs generate
 EXPOSE 3000
-CMD ["sh", "-c", "node ../../node_modules/prisma/build/index.js migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "node scripts/run-prisma.cjs migrate deploy && node dist/main.js"]
