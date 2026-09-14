@@ -271,7 +271,7 @@ function onMenuClick({ key }, item) {
   padding: 16px 12px;
   color: var(--color-rail-text);
   background: linear-gradient(180deg, rgba(10, 12, 24, 0.55) 0%, rgba(18, 20, 40, 0.42) 100%);
-  --empty-line: rgba(215, 220, 240, 0.5);
+  --empty-icon: rgba(215, 220, 240, 0.82);
 }
 .side::before {
   content: "";

@@ -574,7 +574,7 @@ function onKeydown(e) {
   min-height: 0;
   overflow: auto;
   padding: 24px 32px;
-  --empty-line: rgba(215, 220, 240, 0.55);
+  --empty-icon: rgba(215, 220, 240, 0.82);
 }
 .messages :deep(.ant-empty-description) {
   color: var(--color-rail-text);
