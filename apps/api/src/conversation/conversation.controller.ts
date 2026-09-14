@@ -127,7 +127,7 @@ export class ConversationController {
       '客户端必须用 fetch POST，不要 EventSource。',
       '成功：200 + text/event-stream；事件 meta → delta* → done|error。',
       '开始前失败仍为 JSON（401/403/400/404/409）。',
-      'Swagger Try it out 不能完整演示流式，请对照 docs/API.md 第 5 节。',
+      'Swagger Try it out 不能完整演示流式。',
     ].join('\n'),
   })
   @ApiParam({ name: 'id', format: 'uuid' })

@@ -2,6 +2,7 @@
  * @file setup-openapi.ts
  * @author liunannan
  * @date 2026-09-13
+ * @updated 2026-09-14
  * @description 挂载 Swagger UI：/docs 给人看，/docs-json 给工具导入
  */
 import { INestApplication, Logger } from '@nestjs/common';
@@ -35,7 +36,7 @@ export function setupOpenApi(app: INestApplication): void {
         '',
         '**错误体：** `{ code, message, requestId }`。登录失败统一 `AUTH_INVALID`。无归属会话一律 `CONVERSATION_NOT_FOUND`（404）。',
         '',
-        '**流式：** `POST /v1/conversations/:id/messages:stream` 成功时为 `text/event-stream`（event: meta / delta / done / error），Swagger「Try it out」无法完整演示 SSE，请用 fetch。书面约定见仓库 `docs/API.md`。',
+        '**流式：** `POST /v1/conversations/:id/messages:stream` 成功时为 `text/event-stream`（event: meta / delta / done / error），Swagger「Try it out」无法完整演示 SSE，请用 fetch。',
       ].join('\n'),
     )
     .setVersion('1.0')
