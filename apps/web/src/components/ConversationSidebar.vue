@@ -7,6 +7,16 @@
 -->
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  LogoutOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  UnlockOutlined,
+} from '@ant-design/icons-vue';
+import BrandMark from '@/components/BrandMark.vue';
 import EmptyFrame from '@/components/EmptyFrame.vue';
 
 const ROW_HEIGHT = 44;
@@ -144,18 +154,27 @@ function onMenuClick({ key }, item) {
 <template>
   <div class="side">
     <div class="side-head">
-      <strong>会话</strong>
-      <a-button type="primary" size="small" @click="$emit('new')">新对话</a-button>
+      <div class="brand">
+        <BrandMark :size="22" />
+        <strong>会话</strong>
+      </div>
+      <a-button type="primary" size="small" @click="$emit('new')">
+        <template #icon><PlusOutlined /></template>
+        新对话
+      </a-button>
     </div>
-    <input
-      v-model="searchDraft"
-      class="search"
-      type="search"
-      maxlength="100"
-      placeholder="搜索会话标题"
-      autocomplete="off"
-      @input="onSearchInput"
-    />
+    <div class="search-wrap">
+      <SearchOutlined class="search-ico" />
+      <input
+        v-model="searchDraft"
+        class="search"
+        type="search"
+        maxlength="100"
+        placeholder="搜索会话标题"
+        autocomplete="off"
+        @input="onSearchInput"
+      />
+    </div>
     <div class="side-body">
       <a-skeleton v-if="loading" active :title="false" :paragraph="{ rows: 6 }" />
       <a-alert v-else-if="error" type="error" :message="error" show-icon />
@@ -203,12 +222,18 @@ function onMenuClick({ key }, item) {
           @openChange="(open) => onOpenChange(open, item.id)"
         >
           <button type="button" class="more-btn" title="更多" @click.stop>
-            ⋯
+            <MoreOutlined />
           </button>
           <template #overlay>
             <a-menu @click="onMenuClick($event, item)">
-              <a-menu-item key="rename">重命名</a-menu-item>
-              <a-menu-item key="delete">删除</a-menu-item>
+              <a-menu-item key="rename">
+                <EditOutlined />
+                重命名
+              </a-menu-item>
+              <a-menu-item key="delete">
+                <DeleteOutlined />
+                删除
+              </a-menu-item>
             </a-menu>
           </template>
         </a-dropdown>
@@ -222,9 +247,15 @@ function onMenuClick({ key }, item) {
         <span class="user-hint">当前账户</span>
       </div>
       <div class="foot-actions">
-        <button type="button" class="foot-link" @click="$emit('change-password')">更换密码</button>
+        <button type="button" class="foot-link" @click="$emit('change-password')">
+          <UnlockOutlined />
+          更换密码
+        </button>
         <span class="foot-dot" aria-hidden="true">·</span>
-        <button type="button" class="foot-link" @click="$emit('logout')">离开</button>
+        <button type="button" class="foot-link" @click="$emit('logout')">
+          <LogoutOutlined />
+          离开
+        </button>
       </div>
     </div>
   </div>
@@ -262,6 +293,21 @@ function onMenuClick({ key }, item) {
   gap: 8px;
   flex-shrink: 0;
 }
+.side-head :deep(.ant-btn) {
+  display: inline-flex;
+  align-items: center;
+}
+.side :deep(.ant-dropdown-menu-title-content) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .side-body {
   position: relative;
   flex: 1;
@@ -285,11 +331,22 @@ function onMenuClick({ key }, item) {
   font-weight: 600;
   letter-spacing: 0.08em;
 }
-.search {
+.search-wrap {
   position: relative;
   margin: 12px 0 0;
+}
+.search-ico {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(215, 220, 240, 0.45);
+  pointer-events: none;
+}
+.search {
+  position: relative;
   width: 100%;
-  padding: 6px 8px;
+  padding: 6px 8px 6px 28px;
   border: 1px solid var(--color-rail-active);
   border-radius: 6px;
   background: var(--color-rail-inset);
@@ -349,6 +406,9 @@ function onMenuClick({ key }, item) {
   color: rgba(215, 220, 240, 0.35);
 }
 .foot-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 0;
   background: transparent;
   color: rgba(215, 220, 240, 0.78);
@@ -421,13 +481,16 @@ function onMenuClick({ key }, item) {
 }
 .more-btn {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 28px;
   height: 28px;
   border: 0;
   border-radius: 4px;
   background: transparent;
   color: var(--color-rail-text);
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
   opacity: 0;

@@ -8,8 +8,9 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { MenuOutlined } from '@ant-design/icons-vue';
+import { CopyOutlined, MenuOutlined, PauseOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons-vue';
 import { message as antdMessage, Modal } from 'ant-design-vue';
+import BrandMark from '@/components/BrandMark.vue';
 import MarkdownView from '@/components/MarkdownView.vue';
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue';
 import ConversationSidebar from '@/components/ConversationSidebar.vue';
@@ -419,11 +420,13 @@ function onKeydown(e) {
         <a-button type="text" @click="drawerOpen = true">
           <MenuOutlined />
         </a-button>
+        <BrandMark :size="20" />
         <span>AI Chat</span>
       </a-layout-header>
       <div ref="messagesEl" class="messages thin-scroll" @scroll="onMessagesScroll">
         <div v-if="chat.messages.length" class="thread-bar">
           <button type="button" class="copy-btn" @click="copyThread">
+            <CopyOutlined />
             {{ copiedId === 'thread' ? '已复制会话' : '复制本会话' }}
           </button>
         </div>
@@ -456,10 +459,14 @@ function onKeydown(e) {
             />
             <div v-if="msg.status === 'failed'" class="fail-row">
               <a-alert type="error" :message="chat.error || msg.errorCode || '生成失败'" show-icon />
-              <a-button size="small" :disabled="chat.generating" @click="onRetry">重试</a-button>
+              <a-button size="small" :disabled="chat.generating" @click="onRetry">
+                <template #icon><ReloadOutlined /></template>
+                重试
+              </a-button>
             </div>
           </div>
           <button type="button" class="copy-btn msg-copy" @click="copyMessage(msg)">
+            <CopyOutlined />
             {{ copiedId === msg.id ? '已复制' : '复制' }}
           </button>
         </article>
@@ -490,10 +497,21 @@ function onKeydown(e) {
             placeholder="输入消息，Enter 发送，Shift+Enter 换行"
             @keydown="onKeydown"
           />
-          <a-button v-if="chat.generating" @click="onStop">停止</a-button>
-          <a-button type="primary" :disabled="chat.generating || !draft.trim()" @click="onSend">
-            发送
-          </a-button>
+          <div class="composer-actions">
+            <a-button
+              type="primary"
+              size="large"
+              :disabled="chat.generating || !draft.trim()"
+              @click="onSend"
+            >
+              <template #icon><SendOutlined /></template>
+              发送
+            </a-button>
+            <a-button v-if="chat.generating" size="large" @click="onStop">
+              <template #icon><PauseOutlined /></template>
+              停止
+            </a-button>
+          </div>
         </div>
       </div>
     </a-layout>
@@ -546,6 +564,9 @@ function onKeydown(e) {
   margin-bottom: 8px;
 }
 .copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid var(--color-line-strong);
   border-radius: 4px;
   background: var(--color-paper-raised);
@@ -627,8 +648,23 @@ function onKeydown(e) {
 }
 .composer-row {
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 12px;
+}
+.composer-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 108px;
+  flex-shrink: 0;
+}
+.composer-actions :deep(.ant-btn) {
+  width: 100%;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .composer textarea {
   flex: 1;

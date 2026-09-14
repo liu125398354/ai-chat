@@ -2,11 +2,15 @@
   @file LegalView.vue
   @author liunannan
   @date 2026-09-14
+  @updated 2026-09-14
   @description 未登录可访问的用户协议与模型输出免责声明
 -->
 <script setup>
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { ArrowLeftOutlined } from '@ant-design/icons-vue';
+import BrandMark from '@/components/BrandMark.vue';
+import NightSky from '@/components/NightSky.vue';
 
 const route = useRoute();
 
@@ -34,22 +38,28 @@ const page = computed(() => pages[route.params.slug] || null);
 
 <template>
   <div class="legal-page">
-    <div class="horizon" aria-hidden="true" />
+    <NightSky />
     <article v-if="page" class="card">
       <h1>
-        <span class="mark" aria-hidden="true" />
+        <BrandMark :size="24" />
         {{ page.title }}
       </h1>
       <p v-for="(text, index) in page.paragraphs" :key="index">{{ text }}</p>
-      <router-link class="back" :to="{ name: 'login' }">返回登录</router-link>
+      <router-link class="back" :to="{ name: 'login' }">
+        <ArrowLeftOutlined />
+        返回登录
+      </router-link>
     </article>
     <article v-else class="card">
       <h1>
-        <span class="mark" aria-hidden="true" />
+        <BrandMark :size="24" />
         未找到该文档
       </h1>
       <p>请从登录页打开用户协议或模型输出免责声明。</p>
-      <router-link class="back" :to="{ name: 'login' }">返回登录</router-link>
+      <router-link class="back" :to="{ name: 'login' }">
+        <ArrowLeftOutlined />
+        返回登录
+      </router-link>
     </article>
   </div>
 </template>
@@ -61,16 +71,7 @@ const page = computed(() => pages[route.params.slug] || null);
   display: grid;
   place-items: center;
   padding: 32px 16px;
-  background: var(--color-rail);
-}
-.horizon {
-  position: absolute;
-  top: 18%;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--color-horizon);
-  pointer-events: none;
+  overflow: auto;
 }
 .card {
   position: relative;
@@ -91,19 +92,15 @@ h1 {
   font-weight: 600;
   letter-spacing: 0.08em;
 }
-.mark {
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  background: var(--color-brand);
-}
 p {
   margin: 0 0 12px;
   color: var(--color-ink-secondary);
   line-height: 1.7;
 }
 .back {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 8px;
   color: var(--color-brand);
 }

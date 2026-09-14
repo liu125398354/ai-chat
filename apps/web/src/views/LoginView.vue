@@ -3,11 +3,14 @@
   @author liunannan
   @date 2026-09-13
   @updated 2026-09-14
-  @description 登录/注册页：同一套 RSA 加密提交；页脚链向合规静态页
+  @description 登录/注册页：同一套 RSA 加密提交；夜空底与品牌标
 -->
 <script setup>
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { LockOutlined, LoginOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons-vue';
+import BrandMark from '@/components/BrandMark.vue';
+import NightSky from '@/components/NightSky.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const form = reactive({
@@ -77,7 +80,7 @@ function toggleMode() {
 
 <template>
   <div class="login-page">
-    <div class="horizon" aria-hidden="true" />
+    <NightSky />
     <div class="card-frame">
       <span class="corner tl" />
       <span class="corner tr" />
@@ -85,7 +88,7 @@ function toggleMode() {
       <span class="corner br" />
       <a-card class="card" :bordered="false">
         <h1>
-          <span class="mark" aria-hidden="true" />
+          <BrandMark :size="28" />
           AI Chat
         </h1>
         <p class="sub">{{ isRegister ? '注册后进入对话工作台' : '登录后进入对话工作台' }}</p>
@@ -95,25 +98,44 @@ function toggleMode() {
               v-model:value="form.username"
               autocomplete="username"
               :maxlength="64"
-            />
+              placeholder="请输入用户名"
+            >
+              <template #prefix>
+                <UserOutlined class="affix" />
+              </template>
+            </a-input>
           </a-form-item>
           <a-form-item label="密码" name="password">
             <a-input-password
               v-model:value="form.password"
               :autocomplete="isRegister ? 'new-password' : 'current-password'"
               :maxlength="128"
-            />
+              placeholder="请输入密码"
+            >
+              <template #prefix>
+                <LockOutlined class="affix" />
+              </template>
+            </a-input-password>
           </a-form-item>
           <a-form-item v-if="isRegister" label="确认密码" name="confirmPassword">
             <a-input-password
               v-model:value="form.confirmPassword"
               autocomplete="new-password"
               :maxlength="128"
-            />
+              placeholder="再次输入密码"
+            >
+              <template #prefix>
+                <LockOutlined class="affix" />
+              </template>
+            </a-input-password>
           </a-form-item>
           <a-alert v-if="error" type="error" :message="error" show-icon class="err" />
-          <a-button type="primary" html-type="submit" block :loading="submitting">
-            {{ isRegister ? '注册并进入' : '登录' }}
+          <a-button type="primary" html-type="submit" block size="large" :loading="submitting">
+            <template #icon>
+              <UserAddOutlined v-if="isRegister" />
+              <LoginOutlined v-else />
+            </template>
+            {{ isRegister ? '注册并进入' : '登录工作台' }}
           </a-button>
         </a-form>
         <p class="switch">
@@ -137,16 +159,7 @@ function toggleMode() {
   min-height: 100%;
   display: grid;
   place-items: center;
-  background: var(--color-rail);
-}
-.horizon {
-  position: absolute;
-  top: 18%;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--color-horizon);
-  pointer-events: none;
+  overflow: hidden;
 }
 .card-frame {
   position: relative;
@@ -198,11 +211,8 @@ h1 {
   font-weight: 600;
   letter-spacing: 0.12em;
 }
-.mark {
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  background: var(--color-brand);
+.affix {
+  color: var(--color-ink-muted);
 }
 .sub {
   margin: 8px 0 16px;
