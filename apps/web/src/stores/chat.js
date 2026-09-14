@@ -2,14 +2,15 @@
  * @file chat.js
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-13
- * @description 当前会话消息与 generating；切会话 abort 前端 SSE，服务端据此停千帆；generating 时拒绝第二路
+ * @updated 2026-09-14
+ * @description 当前会话消息与 generating；停止/切会话 abort 前端 SSE，服务端据此停千帆；generating 时拒绝第二路
  */
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { listMessages } from '@/api/conversations';
 import { streamMessages } from '@/api/chat';
 import { useConversationsStore } from '@/stores/conversations';
+import { MESSAGE_PAGE_SIZE } from '@/utils/pagination';
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref([]);
@@ -17,6 +18,9 @@ export const useChatStore = defineStore('chat', () => {
   const generating = ref(false);
   const error = ref('');
   const streamConversationId = ref('');
+  const hasOlder = ref(false);
+  const loadingOlder = ref(false);
+  let olderCursor = null;
   let abortController = null;
 
   function abortInFlight() {
@@ -30,6 +34,8 @@ export const useChatStore = defineStore('chat', () => {
     abortInFlight();
     messages.value = [];
     error.value = '';
+    hasOlder.value = false;
+    olderCursor = null;
   }
 
   async function load(conversationId) {
@@ -42,8 +48,10 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = true;
     error.value = '';
     messages.value = [];
+    hasOlder.value = false;
+    olderCursor = null;
     try {
-      const data = await listMessages(conversationId);
+      const data = await listMessages(conversationId, { limit: MESSAGE_PAGE_SIZE });
       if (generating.value && streamConversationId.value === conversationId) {
         return;
       }
@@ -51,10 +59,38 @@ export const useChatStore = defineStore('chat', () => {
         return;
       }
       messages.value = data.items || [];
+      olderCursor = data.nextCursor || null;
+      hasOlder.value = Boolean(olderCursor);
     } catch (err) {
       error.value = err.response?.data?.message || err.message || '加载消息失败';
     } finally {
       loading.value = false;
+    }
+  }
+
+  /** 向上滚动时预加载更早消息；按 createdAt 拼到现有列表前面。 */
+  async function loadOlder(conversationId) {
+    if (!conversationId || !olderCursor || loadingOlder.value || generating.value) {
+      return;
+    }
+    loadingOlder.value = true;
+    try {
+      const data = await listMessages(conversationId, {
+        limit: MESSAGE_PAGE_SIZE,
+        cursor: olderCursor,
+      });
+      if (useConversationsStore().currentId !== conversationId) {
+        return;
+      }
+      const incoming = data.items || [];
+      const seen = new Set(messages.value.map((row) => row.id));
+      messages.value = [...incoming.filter((row) => !seen.has(row.id)), ...messages.value];
+      olderCursor = data.nextCursor || null;
+      hasOlder.value = Boolean(olderCursor);
+    } catch (err) {
+      error.value = err.response?.data?.message || err.message || '加载更早消息失败';
+    } finally {
+      loadingOlder.value = false;
     }
   }
 
@@ -157,7 +193,10 @@ export const useChatStore = defineStore('chat', () => {
     generating,
     error,
     streamConversationId,
+    hasOlder,
+    loadingOlder,
     load,
+    loadOlder,
     send,
     abortInFlight,
     clear,

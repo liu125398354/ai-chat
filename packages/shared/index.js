@@ -31,7 +31,11 @@ const SSE_EVENTS = Object.freeze({
   ERROR: 'error',
 });
 
+/** 发给千帆的最近消息条数默认上限；与 API CONTEXT_MAX_MESSAGES 默认值对齐。 */
+const CONTEXT_MAX_MESSAGES = 20;
+
 module.exports = {
   ERROR_CODES,
   SSE_EVENTS,
+  CONTEXT_MAX_MESSAGES,
 };

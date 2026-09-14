@@ -2,8 +2,8 @@
   @file ChatView.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-13
-  @description 工作台：固定侧栏滚动列表 + 消息区内滚动 + 流式展示
+  @updated 2026-09-14
+  @description 工作台：固定侧栏滚动列表 + 消息区内滚动 + 流式展示；生成可停止
 -->
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -19,6 +19,7 @@ import { useChatStore } from '@/stores/chat';
 import { useConversationsStore } from '@/stores/conversations';
 import { copyText } from '@/utils/clipboard';
 import { titleFromUserContent } from '@/utils/conversation-title';
+import { CONTEXT_MAX_MESSAGES } from '@/utils/context-window';
 
 const auth = useAuthStore();
 const conversations = useConversationsStore();
@@ -39,9 +40,15 @@ let media = null;
 let copiedTimer = 0;
 let skipNextEnter = true;
 let prevMessageIds = [];
+let restoringOlder = false;
+const stickToBottom = ref(true);
 
 const emptyWorkbench = computed(
-  () => !conversations.currentId && !conversations.loading && conversations.items.length === 0,
+  () =>
+    !conversations.currentId &&
+    !conversations.loading &&
+    conversations.items.length === 0 &&
+    !conversations.query,
 );
 
 const lastAssistant = computed(() => {
@@ -50,6 +57,12 @@ const lastAssistant = computed(() => {
 });
 
 const streamText = computed(() => lastAssistant.value?.content || '');
+
+const showContextHint = computed(() => chat.messages.length > CONTEXT_MAX_MESSAGES);
+
+const contextHintText = computed(
+  () => `仅使用最近 ${CONTEXT_MAX_MESSAGES} 条作为上下文`,
+);
 
 function syncViewport() {
   isMobile.value = media.matches;
@@ -64,10 +77,17 @@ onMounted(async () => {
   media.addEventListener('change', syncViewport);
   await conversations.fetchList();
   const fromQuery = typeof route.query.c === 'string' ? route.query.c : '';
-  const nextId = fromQuery || conversations.items[0]?.id || '';
-  if (nextId) {
-    conversations.select(nextId);
+  const owned = fromQuery && conversations.items.some((row) => row.id === fromQuery);
+  const nextId = owned ? fromQuery : conversations.items[0]?.id || '';
+  if (nextId === conversations.currentId) {
+    if (nextId) {
+      await chat.load(nextId);
+    } else {
+      chat.clear();
+    }
+    return;
   }
+  conversations.select(nextId);
 });
 
 onUnmounted(() => {
@@ -114,6 +134,8 @@ watch(
 watch(
   () => [chat.messages.length, streamText.value],
   async () => {
+    if (restoringOlder) return;
+    if (!stickToBottom.value) return;
     await nextTick();
     if (messagesEl.value) {
       messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
@@ -162,6 +184,9 @@ async function onNewChat() {
   draft.value = '';
   composerKey.value += 1;
   drawerOpen.value = false;
+  if (conversations.query) {
+    await conversations.setQuery('');
+  }
   if (!isDraftNewChat()) {
     conversations.select('');
   }
@@ -171,6 +196,34 @@ async function onNewChat() {
 
 function onSelect(id) {
   conversations.select(id);
+}
+
+async function onSearch(q) {
+  await conversations.setQuery(q);
+}
+
+async function onLoadMore() {
+  await conversations.fetchList({ append: true });
+}
+
+async function onMessagesScroll() {
+  const el = messagesEl.value;
+  if (!el) return;
+  stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  if (el.scrollTop > 48 || !chat.hasOlder || chat.loadingOlder || restoringOlder) {
+    return;
+  }
+  restoringOlder = true;
+  skipNextEnter = true;
+  const prevHeight = el.scrollHeight;
+  const prevTop = el.scrollTop;
+  try {
+    await chat.loadOlder(conversations.currentId);
+    await nextTick();
+    el.scrollTop = el.scrollHeight - prevHeight + prevTop;
+  } finally {
+    restoringOlder = false;
+  }
 }
 
 async function onRename(id, title) {
@@ -200,6 +253,10 @@ async function onLogout() {
   chat.abortInFlight();
   await auth.logout();
   await router.push({ name: 'login' });
+}
+
+function onStop() {
+  chat.abortInFlight();
 }
 
 async function onSend() {
@@ -296,14 +353,19 @@ function onKeydown(e) {
         :items="conversations.items"
         :current-id="conversations.currentId"
         :loading="conversations.loading"
+        :loading-more="conversations.loadingMore"
+        :has-more="conversations.hasMore"
         :error="conversations.error"
         :username="auth.user?.username"
+        :query="conversations.query"
         @new="onNewChat"
         @select="onSelect"
         @delete="onDelete"
         @rename="onRename"
         @logout="onLogout"
         @change-password="passwordOpen = true"
+        @search="onSearch"
+        @load-more="onLoadMore"
       />
     </a-layout-sider>
 
@@ -320,14 +382,19 @@ function onKeydown(e) {
         :items="conversations.items"
         :current-id="conversations.currentId"
         :loading="conversations.loading"
+        :loading-more="conversations.loadingMore"
+        :has-more="conversations.hasMore"
         :error="conversations.error"
         :username="auth.user?.username"
+        :query="conversations.query"
         @new="onNewChat"
         @select="onSelect"
         @delete="onDelete"
         @rename="onRename"
         @logout="onLogout"
         @change-password="passwordOpen = true"
+        @search="onSearch"
+        @load-more="onLoadMore"
       />
     </a-drawer>
 
@@ -338,7 +405,7 @@ function onKeydown(e) {
         </a-button>
         <span>AI Chat</span>
       </a-layout-header>
-      <div ref="messagesEl" class="messages thin-scroll">
+      <div ref="messagesEl" class="messages thin-scroll" @scroll="onMessagesScroll">
         <div v-if="chat.messages.length" class="thread-bar">
           <button type="button" class="copy-btn" @click="copyThread">
             {{ copiedId === 'thread' ? '已复制会话' : '复制本会话' }}
@@ -390,18 +457,28 @@ function onKeydown(e) {
         <a-alert v-if="sendError" type="error" :message="sendError" show-icon class="alert-gap" />
       </div>
       <div class="composer">
-        <textarea
-          :key="composerKey"
-          ref="composerRef"
-          v-model="draft"
-          rows="3"
-          maxlength="8000"
-          placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-          @keydown="onKeydown"
+        <a-alert
+          v-if="showContextHint"
+          type="info"
+          show-icon
+          class="context-hint"
+          :message="contextHintText"
         />
-        <a-button type="primary" :disabled="chat.generating || !draft.trim()" @click="onSend">
-          发送
-        </a-button>
+        <div class="composer-row">
+          <textarea
+            :key="composerKey"
+            ref="composerRef"
+            v-model="draft"
+            rows="3"
+            maxlength="8000"
+            placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+            @keydown="onKeydown"
+          />
+          <a-button v-if="chat.generating" @click="onStop">停止</a-button>
+          <a-button type="primary" :disabled="chat.generating || !draft.trim()" @click="onSend">
+            发送
+          </a-button>
+        </div>
       </div>
     </a-layout>
   </a-layout>
@@ -522,12 +599,20 @@ function onKeydown(e) {
 }
 .composer {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   gap: 12px;
   padding: 16px 32px 24px;
   border-top: 1px solid var(--color-line);
   background: var(--color-paper-raised);
   flex-shrink: 0;
+}
+.context-hint {
+  margin: 0;
+}
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
 }
 .composer textarea {
   flex: 1;

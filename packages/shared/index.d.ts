@@ -23,3 +23,5 @@ export const SSE_EVENTS: {
   readonly DONE: 'done';
   readonly ERROR: 'error';
 };
+
+export const CONTEXT_MAX_MESSAGES: 20;
