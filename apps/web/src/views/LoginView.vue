@@ -2,17 +2,18 @@
   @file LoginView.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-13
-  @description 登录页：提交凭证并跳转工作台；夜空平涂与静止夕烧线
+  @updated 2026-09-14
+  @description 登录/注册页：同一套 RSA 加密提交；页脚链向合规静态页
 -->
 <script setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 
 const form = reactive({
   username: '',
   password: '',
+  confirmPassword: '',
 });
 const submitting = ref(false);
 const error = ref('');
@@ -20,18 +21,57 @@ const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
+const isRegister = computed(() => route.name === 'register');
+
+const rules = computed(() => ({
+  username: [{ required: true, message: '请输入用户名' }],
+  password: isRegister.value
+    ? [
+        { required: true, message: '请输入密码' },
+        { min: 8, max: 128, message: '密码长度为 8–128 个字符' },
+      ]
+    : [{ required: true, message: '请输入密码' }],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码' },
+    {
+      validator: async (_rule, value) => {
+        if (value && value !== form.password) {
+          throw new Error('两次输入的密码不一致');
+        }
+      },
+    },
+  ],
+}));
+
+watch(isRegister, () => {
+  error.value = '';
+  form.confirmPassword = '';
+});
+
 async function onSubmit() {
   error.value = '';
   submitting.value = true;
   try {
-    await auth.login(form.username, form.password);
+    if (isRegister.value) {
+      await auth.register(form.username.trim(), form.password);
+    } else {
+      await auth.login(form.username, form.password);
+    }
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/chat';
     await router.replace(redirect);
   } catch (err) {
-    error.value = err.response?.data?.message || '用户名或密码错误';
+    error.value =
+      err.response?.data?.message || (isRegister.value ? '注册失败' : '用户名或密码错误');
   } finally {
     submitting.value = false;
   }
+}
+
+function toggleMode() {
+  router.replace({
+    name: isRegister.value ? 'login' : 'register',
+    query: route.query.redirect ? { redirect: route.query.redirect } : undefined,
+  });
 }
 </script>
 
@@ -48,29 +88,46 @@ async function onSubmit() {
           <span class="mark" aria-hidden="true" />
           AI Chat
         </h1>
-        <p class="sub">登录后进入对话工作台</p>
-        <a-form layout="vertical" :model="form" @finish="onSubmit">
-          <a-form-item label="用户名" name="username" :rules="[{ required: true, message: '请输入用户名' }]">
+        <p class="sub">{{ isRegister ? '注册后进入对话工作台' : '登录后进入对话工作台' }}</p>
+        <a-form layout="vertical" :model="form" :rules="rules" @finish="onSubmit">
+          <a-form-item label="用户名" name="username">
             <a-input
               v-model:value="form.username"
               autocomplete="username"
               :maxlength="64"
             />
           </a-form-item>
-          <a-form-item label="密码" name="password" :rules="[{ required: true, message: '请输入密码' }]">
+          <a-form-item label="密码" name="password">
             <a-input-password
               v-model:value="form.password"
-              autocomplete="current-password"
+              :autocomplete="isRegister ? 'new-password' : 'current-password'"
+              :maxlength="128"
+            />
+          </a-form-item>
+          <a-form-item v-if="isRegister" label="确认密码" name="confirmPassword">
+            <a-input-password
+              v-model:value="form.confirmPassword"
+              autocomplete="new-password"
               :maxlength="128"
             />
           </a-form-item>
           <a-alert v-if="error" type="error" :message="error" show-icon class="err" />
           <a-button type="primary" html-type="submit" block :loading="submitting">
-            登录
+            {{ isRegister ? '注册并进入' : '登录' }}
           </a-button>
         </a-form>
+        <p class="switch">
+          <button type="button" class="linkish" @click="toggleMode">
+            {{ isRegister ? '已有账号？去登录' : '没有账号？注册' }}
+          </button>
+        </p>
       </a-card>
     </div>
+    <footer class="legal">
+      <router-link :to="{ name: 'legal', params: { slug: 'terms' } }">用户协议</router-link>
+      <span aria-hidden="true">·</span>
+      <router-link :to="{ name: 'legal', params: { slug: 'disclaimer' } }">模型输出免责</router-link>
+    </footer>
   </div>
 </template>
 
@@ -95,6 +152,7 @@ async function onSubmit() {
   position: relative;
   width: 380px;
   max-width: calc(100vw - 32px);
+  z-index: 1;
 }
 .corner {
   position: absolute;
@@ -153,5 +211,34 @@ h1 {
 }
 .err {
   margin-bottom: 12px;
+}
+.switch {
+  margin: 16px 0 0;
+  text-align: center;
+}
+.linkish {
+  border: 0;
+  background: none;
+  color: var(--color-brand);
+  cursor: pointer;
+  padding: 0;
+}
+.legal {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  z-index: 1;
+  color: var(--color-rail-text);
+  font-size: 12px;
+}
+.legal a {
+  color: var(--color-rail-text);
+}
+.legal a:hover {
+  color: #fff;
 }
 </style>

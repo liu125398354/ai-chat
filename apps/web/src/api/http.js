@@ -27,7 +27,7 @@ http.interceptors.response.use(
     const status = error.response?.status;
     if (status === 401 || status === 403) {
       const url = String(error.config?.url || '');
-      if (url.includes('/v1/auth/login')) {
+      if (url.includes('/v1/auth/login') || url.includes('/v1/auth/register')) {
         return Promise.reject(error);
       }
       const auth = useAuthStore();

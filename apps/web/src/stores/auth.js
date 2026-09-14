@@ -2,11 +2,14 @@
  * @file auth.js
  * @author liunannan
  * @date 2026-09-13
+ * @updated 2026-09-14
  * @description 登录态：Token 仅存 sessionStorage；提交前加密密码
  */
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import * as authApi from '@/api/auth';
+import { useChatStore } from '@/stores/chat';
+import { useConversationsStore } from '@/stores/conversations';
 import { encryptPassword } from '@/utils/password-crypto';
 
 const TOKEN_KEY = 'ai-chat-token';
@@ -25,11 +28,17 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.setItem(USER_KEY, JSON.stringify(nextUser));
   }
 
+  function resetWorkspace() {
+    useChatStore().clear();
+    useConversationsStore().reset();
+  }
+
   function clearSession() {
     token.value = '';
     user.value = null;
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
+    resetWorkspace();
   }
 
   /** 拉取公钥后加密明文再登录。 */
@@ -37,6 +46,17 @@ export const useAuthStore = defineStore('auth', () => {
     const publicKey = await authApi.getPublicKey();
     const cipher = await encryptPassword(password, publicKey);
     const data = await authApi.login({ username, password: cipher });
+    resetWorkspace();
+    persist(data.token, data.user);
+    return data.user;
+  }
+
+  /** 拉取公钥后加密明文再注册；成功即写入登录态。 */
+  async function register(username, password) {
+    const publicKey = await authApi.getPublicKey();
+    const cipher = await encryptPassword(password, publicKey);
+    const data = await authApi.register({ username, password: cipher });
+    resetWorkspace();
     persist(data.token, data.user);
     return data.user;
   }
@@ -56,7 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
     clearSession();
   }
 
-  return { token, user, isAuthenticated, login, logout, changePassword, clearSession };
+  return { token, user, isAuthenticated, login, register, logout, changePassword, clearSession };
 });
 
 function readUser() {

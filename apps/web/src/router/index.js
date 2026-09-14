@@ -2,7 +2,8 @@
  * @file index.js
  * @author liunannan
  * @date 2026-09-13
- * @description 路由：/login、/chat；requiresAuth 仅体验拦截
+ * @updated 2026-09-14
+ * @description 路由：登录/注册、合规静态页、工作台；requiresAuth 仅体验拦截
  */
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
@@ -14,6 +15,16 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/views/LoginView.vue'),
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/LoginView.vue'),
+    },
+    {
+      path: '/legal/:slug',
+      name: 'legal',
+      component: () => import('@/views/LegalView.vue'),
     },
     {
       path: '/chat',
@@ -31,7 +42,7 @@ router.beforeEach((to) => {
   if (to.meta.requiresAuth && !auth.token) {
     return { name: 'login', query: { redirect: to.fullPath } };
   }
-  if (to.name === 'login' && auth.token) {
+  if ((to.name === 'login' || to.name === 'register') && auth.token) {
     return { name: 'chat' };
   }
   return true;
