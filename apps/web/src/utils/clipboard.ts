@@ -1,15 +1,11 @@
 /**
- * @file clipboard.js
+ * @file clipboard.ts
  * @author liunannan
  * @date 2026-09-13
  * @description 复制到剪贴板；Clipboard API 失败时回退 execCommand
  */
 
-/**
- * @param {string} text
- * @returns {Promise<boolean>}
- */
-export async function copyText(text) {
+export async function copyText(text: string) {
   const value = text ?? '';
   if (navigator.clipboard?.writeText) {
     try {

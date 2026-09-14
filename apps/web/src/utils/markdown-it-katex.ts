@@ -1,13 +1,18 @@
 /**
- * @file markdown-it-katex.js
+ * @file markdown-it-katex.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-13
  * @description markdown-it 插件：宽松解析 $...$ / $$...$$ / \\(...\\) / \\[...\\] 为 KaTeX
  */
+/* markdown-it rule state 形状由库回调注入，与 RuleInline/RuleBlock 对齐即可 */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import katex from 'katex';
+import type MarkdownIt from 'markdown-it';
+import type { Token } from 'markdown-it';
+import type { KatexOptions } from 'katex';
 
-const KATEX_OPTS = {
+const KATEX_OPTS: KatexOptions = {
   throwOnError: false,
   strict: 'ignore',
   output: 'html',
@@ -17,7 +22,7 @@ const KATEX_OPTS = {
 const DISPLAY_ENV =
   /\\begin\{(pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|smallmatrix|cases|aligned|align\*?|equation\*?|gather\*?)\}/;
 
-function renderKatex(tex, displayMode) {
+function renderKatex(tex: string, displayMode: boolean) {
   const src = tex.trim();
   const display = displayMode || DISPLAY_ENV.test(src);
   try {
@@ -28,13 +33,13 @@ function renderKatex(tex, displayMode) {
   }
 }
 
-function isEscaped(src, pos) {
+function isEscaped(src: string, pos: number) {
   let n = 0;
   while (pos - n - 1 >= 0 && src.charCodeAt(pos - n - 1) === 0x5c) n += 1;
   return n % 2 === 1;
 }
 
-function mathInline(state, silent) {
+function mathInline(state: any, silent: boolean) {
   const start = state.pos;
   if (state.src.charCodeAt(start) !== 0x24) return false;
   if (isEscaped(state.src, start)) return false;
@@ -67,7 +72,7 @@ function mathInline(state, silent) {
   return true;
 }
 
-function mathBlock(state, start, end, silent) {
+function mathBlock(state: any, start: number, end: number, silent: boolean) {
   const pos = state.bMarks[start] + state.tShift[start];
   const max = state.eMarks[start];
   if (pos + 1 >= max) return false;
@@ -103,7 +108,7 @@ function mathBlock(state, start, end, silent) {
   return true;
 }
 
-function mathParenInline(state, silent) {
+function mathParenInline(state: any, silent: boolean) {
   if (state.src.slice(state.pos, state.pos + 2) !== '\\(') return false;
   const end = state.src.indexOf('\\)', state.pos + 2);
   if (end < 0) return false;
@@ -118,7 +123,7 @@ function mathParenInline(state, silent) {
   return true;
 }
 
-function mathBracketInline(state, silent) {
+function mathBracketInline(state: any, silent: boolean) {
   if (state.src.slice(state.pos, state.pos + 2) !== '\\[') return false;
   const end = state.src.indexOf('\\]', state.pos + 2);
   if (end < 0) return false;
@@ -134,7 +139,7 @@ function mathBracketInline(state, silent) {
   return true;
 }
 
-function mathBracketBlock(state, start, end, silent) {
+function mathBracketBlock(state: any, start: number, end: number, silent: boolean) {
   const pos = state.bMarks[start] + state.tShift[start];
   const max = state.eMarks[start];
   const first = state.src.slice(pos, max);
@@ -173,7 +178,7 @@ function mathBracketBlock(state, start, end, silent) {
 }
 
 /** @param {import('markdown-it')} md */
-export function markdownItKatex(md) {
+export function markdownItKatex(md: MarkdownIt) {
   md.inline.ruler.before('escape', 'math_paren', mathParenInline);
   md.inline.ruler.before('escape', 'math_bracket_inline', mathBracketInline);
   md.inline.ruler.after('backticks', 'math_inline', mathInline);
@@ -183,7 +188,7 @@ export function markdownItKatex(md) {
   md.block.ruler.before('fence', 'math_bracket', mathBracketBlock, {
     alt: ['paragraph', 'reference', 'blockquote', 'list'],
   });
-  md.renderer.rules.math_inline = (tokens, idx) => {
+  md.renderer.rules.math_inline = (tokens: Token[], idx: number) => {
     const tex = tokens[idx].content;
     const html = renderKatex(tex, false);
     if (DISPLAY_ENV.test(tex.trim())) {
@@ -191,8 +196,8 @@ export function markdownItKatex(md) {
     }
     return html;
   };
-  md.renderer.rules.math_display = (tokens, idx) =>
+  md.renderer.rules.math_display = (tokens: Token[], idx: number) =>
     `<div class="katex-display-wrap">${renderKatex(tokens[idx].content, true)}</div>\n`;
-  md.renderer.rules.math_block = (tokens, idx) =>
+  md.renderer.rules.math_block = (tokens: Token[], idx: number) =>
     `<div class="katex-display-wrap">${renderKatex(tokens[idx].content, true)}</div>\n`;
 }

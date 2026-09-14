@@ -1,5 +1,5 @@
 /**
- * @file last-conversation.js
+ * @file last-conversation.ts
  * @author liunannan
  * @date 2026-09-14
  * @description 按用户记住上次选中的会话；localStorage，登出不清，避免串户
@@ -7,8 +7,7 @@
 
 const PREFIX = 'ai-chat-last-conversation:';
 
-/** @param {string} [userId] */
-export function readLastConversation(userId) {
+export function readLastConversation(userId?: string) {
   if (!userId) return '';
   try {
     return localStorage.getItem(PREFIX + userId) || '';
@@ -17,11 +16,7 @@ export function readLastConversation(userId) {
   }
 }
 
-/**
- * @param {string} [userId]
- * @param {string} [conversationId]
- */
-export function writeLastConversation(userId, conversationId) {
+export function writeLastConversation(userId?: string, conversationId?: string) {
   if (!userId) return;
   try {
     if (conversationId) {

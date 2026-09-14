@@ -1,14 +1,14 @@
 /**
- * @file markdown.spec.js
+ * @file markdown.spec.ts
  * @author liunannan
  * @date 2026-09-13
  * @description 分数、指数、导数、行列式应渲染为 KaTeX，而不是残缺文本
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { markdown, wrapBareMathEnvs, markdownLive } from './markdown.js';
+import { markdown, wrapBareMathEnvs, markdownLive } from './markdown';
 
-function render(src) {
+function render(src: string) {
   return markdown.render(src);
 }
 

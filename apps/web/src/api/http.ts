@@ -1,5 +1,5 @@
 /**
- * @file http.js
+ * @file http.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-14
@@ -8,6 +8,7 @@
 import axios from 'axios';
 import { ERROR_CODES } from '@ai-chat/shared';
 import { useAuthStore } from '@/stores/auth';
+import type { ApiErrorBody } from '@/types/models';
 import { expireClientSession, isAuthSessionCode } from '@/utils/session-expire';
 
 export const http = axios.create({
@@ -28,7 +29,7 @@ http.interceptors.response.use(
   (res) => res,
   async (error) => {
     const status = error.response?.status;
-    const code = error.response?.data?.code;
+    const code = (error.response?.data as ApiErrorBody | undefined)?.code;
     const url = String(error.config?.url || '');
     if (url.includes('/v1/auth/login') || url.includes('/v1/auth/register')) {
       return Promise.reject(error);

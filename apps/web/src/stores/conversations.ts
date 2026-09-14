@@ -1,5 +1,5 @@
 /**
- * @file conversations.js
+ * @file conversations.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-14
@@ -8,20 +8,22 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import * as convApi from '@/api/conversations';
+import type { Conversation } from '@/types/models';
+import { errorMessage } from '@/utils/axios-error';
 import { CONVERSATION_PAGE_SIZE } from '@/utils/pagination';
 import { DEFAULT_CONVERSATION_TITLE } from '@/utils/conversation-title';
 
 export const useConversationsStore = defineStore('conversations', () => {
-  const items = ref([]);
+  const items = ref<Conversation[]>([]);
   const currentId = ref('');
   const loading = ref(false);
   const loadingMore = ref(false);
   const error = ref('');
   const query = ref('');
-  const nextCursor = ref(null);
+  const nextCursor = ref<string | null>(null);
   const hasMore = computed(() => Boolean(nextCursor.value));
 
-  async function fetchList(options = {}) {
+  async function fetchList(options: { silent?: boolean; append?: boolean } = {}) {
     const silent = Boolean(options.silent);
     const append = Boolean(options.append);
     if (append) {
@@ -34,7 +36,7 @@ export const useConversationsStore = defineStore('conversations', () => {
     try {
       const data = await convApi.listConversations({
         limit: CONVERSATION_PAGE_SIZE,
-        cursor: append ? nextCursor.value : undefined,
+        cursor: append ? nextCursor.value || undefined : undefined,
         q: query.value || undefined,
       });
       const page = data.items || [];
@@ -51,26 +53,26 @@ export const useConversationsStore = defineStore('conversations', () => {
         nextCursor.value = data.nextCursor || null;
       }
     } catch (err) {
-      error.value = err.response?.data?.message || err.message || '加载会话失败';
+      error.value = errorMessage(err, '加载会话失败');
     } finally {
       loading.value = false;
       loadingMore.value = false;
     }
   }
 
-  function setQuery(next) {
+  function setQuery(next: string) {
     query.value = next;
     return fetchList();
   }
 
   /** 落库并插入侧栏；不选中，避免 watch 在首条发送前 load 冲掉乐观消息。 */
-  async function create(title) {
+  async function create(title?: string) {
     const created = await convApi.createConversation(title);
     items.value = [created, ...items.value.filter((row) => row.id !== created.id)];
     return created;
   }
 
-  async function remove(id) {
+  async function remove(id: string) {
     await convApi.deleteConversation(id);
     items.value = items.value.filter((row) => row.id !== id);
     if (currentId.value === id) {
@@ -78,7 +80,7 @@ export const useConversationsStore = defineStore('conversations', () => {
     }
   }
 
-  async function rename(id, title) {
+  async function rename(id: string, title: string) {
     const updated = await convApi.renameConversation(id, title);
     const idx = items.value.findIndex((row) => row.id === id);
     if (idx >= 0) {
@@ -88,7 +90,7 @@ export const useConversationsStore = defineStore('conversations', () => {
   }
 
   /** 首条提问或 SSE meta 后更新标题并置顶，不整表刷新。 */
-  function touch(id, title) {
+  function touch(id: string, title?: string) {
     const idx = items.value.findIndex((item) => item.id === id);
     if (idx < 0) return;
     const next = {
@@ -100,17 +102,17 @@ export const useConversationsStore = defineStore('conversations', () => {
     items.value.unshift(next);
   }
 
-  function isDefaultTitle(id) {
+  function isDefaultTitle(id: string) {
     const row = items.value.find((item) => item.id === id);
     return !row || row.title === DEFAULT_CONVERSATION_TITLE;
   }
 
-  function select(id) {
+  function select(id: string) {
     currentId.value = id;
   }
 
   /** 当前用户是否仍拥有该会话；首屏列表未覆盖时再探消息接口。 */
-  async function isOwned(id) {
+  async function isOwned(id: string) {
     if (!id) return false;
     if (items.value.some((row) => row.id === id)) return true;
     try {

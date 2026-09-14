@@ -1,21 +1,26 @@
 /**
- * @file chat.js
+ * @file chat.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-14
  * @description SSE 流式发送：必须 fetch + Bearer，禁止 EventSource
  */
 import { ERROR_CODES } from '@ai-chat/shared';
+import type { StreamError } from '@/types/models';
 import { expireClientSession, isAuthSessionCode } from '@/utils/session-expire';
+
+export type SseHandler = (event: string, data: Record<string, unknown>) => void;
 
 /**
  * POST 流式对话并解析 SSE 事件。
- * @param {string} conversationId
- * @param {{ content: string }} body
- * @param {AbortSignal} [signal]
- * @param {(event: string, data: object) => void} onEvent
+ * 须带 Bearer，禁止 EventSource。
  */
-export async function streamMessages(conversationId, body, signal, onEvent) {
+export async function streamMessages(
+  conversationId: string,
+  body: { content: string },
+  signal: AbortSignal | undefined,
+  onEvent: SseHandler,
+) {
   const token = sessionStorage.getItem('ai-chat-token');
   const res = await fetch(`/api/v1/conversations/${conversationId}/messages:stream`, {
     method: 'POST',
@@ -29,7 +34,10 @@ export async function streamMessages(conversationId, body, signal, onEvent) {
   });
 
   if (!res.ok) {
-    let payload = { code: ERROR_CODES.INTERNAL_ERROR, message: '发送失败' };
+    let payload: { code?: string; message?: string } = {
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: '发送失败',
+    };
     try {
       payload = await res.json();
     } catch {
@@ -38,7 +46,7 @@ export async function streamMessages(conversationId, body, signal, onEvent) {
     if (res.status === 401 || res.status === 403 || isAuthSessionCode(payload.code)) {
       await expireClientSession();
     }
-    const err = new Error(payload.message || '发送失败');
+    const err: StreamError = new Error(payload.message || '发送失败');
     err.code = payload.code;
     err.status = res.status;
     throw err;
@@ -61,13 +69,8 @@ export async function streamMessages(conversationId, body, signal, onEvent) {
   consumeSse(buffer, onEvent, true);
 }
 
-/**
- * 按空行切分 SSE 块并回调；兼容 LF / CRLF。
- * @param {string} buffer
- * @param {(event: string, data: object) => void} onEvent
- * @param {boolean} [flushTail]
- */
-function consumeSse(buffer, onEvent, flushTail = false) {
+/** 按空行切分 SSE 块并回调；兼容 LF / CRLF。 */
+function consumeSse(buffer: string, onEvent: SseHandler, flushTail = false) {
   const parts = buffer.split(/\r?\n\r?\n/);
   const rest = flushTail ? '' : parts.pop() || '';
   const blocks = flushTail ? (buffer.trim() ? [buffer] : []) : parts;
@@ -78,10 +81,9 @@ function consumeSse(buffer, onEvent, flushTail = false) {
   return rest;
 }
 
-/** @param {string} block */
-function parseSseBlock(block) {
+function parseSseBlock(block: string) {
   let event = 'message';
-  const dataLines = [];
+  const dataLines: string[] = [];
   for (const line of block.split(/\r?\n/)) {
     if (line.startsWith('event:')) {
       event = line.slice(6).trim();
@@ -91,7 +93,7 @@ function parseSseBlock(block) {
   }
   if (dataLines.length === 0) return null;
   try {
-    return { event, data: JSON.parse(dataLines.join('\n')) };
+    return { event, data: JSON.parse(dataLines.join('\n')) as Record<string, unknown> };
   } catch {
     return { event, data: { content: dataLines.join('\n') } };
   }

@@ -1,5 +1,5 @@
 /**
- * @file main.js
+ * @file main.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-14

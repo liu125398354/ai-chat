@@ -1,5 +1,5 @@
 /**
- * @file vite.config.js
+ * @file vite.config.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-14
@@ -7,6 +7,7 @@
  */
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
+import type { Plugin } from 'vite';
 import vue from '@vitejs/plugin-vue';
 
 const qianfanTimeoutMs = Number(process.env.QIANFAN_TIMEOUT_MS) || 120000;
@@ -17,7 +18,7 @@ const proxyTimeout = qianfanTimeoutMs + 5000;
  * Markdown/KaTeX/hljs 只随 Chat 拉取；不要把整个 ant-design-vue 打进同一 named chunk，
  * 否则 Layout 等会并入登录首包。
  */
-function manualChunks(id) {
+function manualChunks(id: string) {
   const n = id.replace(/\\/g, '/');
   if (!n.includes('node_modules')) return undefined;
   if (
@@ -36,7 +37,7 @@ function manualChunks(id) {
 }
 
 /** 现代浏览器走 woff2；去掉 KaTeX ttf 减小镜像，CSS 仍保留 woff 回退。 */
-function omitKatexTtf() {
+function omitKatexTtf(): Plugin {
   return {
     name: 'omit-katex-ttf',
     generateBundle(_opts, bundle) {

@@ -1,5 +1,5 @@
 /**
- * @file markdown.js
+ * @file markdown.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-14
@@ -28,9 +28,11 @@ import sql from 'highlight.js/lib/languages/sql';
 import typescript from 'highlight.js/lib/languages/typescript';
 import xml from 'highlight.js/lib/languages/xml';
 import yaml from 'highlight.js/lib/languages/yaml';
-import { markdownItKatex } from './markdown-it-katex.js';
+import type { LanguageFn } from 'highlight.js';
+import type { Token } from 'markdown-it';
+import { markdownItKatex } from './markdown-it-katex';
 
-const HLJS_LANGS = {
+const HLJS_LANGS: Record<string, LanguageFn> = {
   bash,
   c,
   cpp,
@@ -59,7 +61,7 @@ for (const [name, def] of Object.entries(HLJS_LANGS)) {
 }
 hljs.registerLanguage('tex', latex);
 
-const LANG_ALIAS = {
+const LANG_ALIAS: Record<string, string> = {
   js: 'javascript',
   ts: 'typescript',
   py: 'python',
@@ -73,7 +75,7 @@ const LANG_ALIAS = {
   cs: 'csharp',
 };
 
-function escapeHtml(text) {
+function escapeHtml(text: string) {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -81,7 +83,7 @@ function escapeHtml(text) {
     .replace(/"/g, '&quot;');
 }
 
-function highlightCode(code, lang) {
+function highlightCode(code: string, lang: string) {
   const key = LANG_ALIAS[lang] || lang;
   try {
     if (key && hljs.getLanguage(key)) {
@@ -94,8 +96,8 @@ function highlightCode(code, lang) {
 }
 
 /** 代码围栏外包一层，供点击复制；不高亮失败时回退转义。 */
-function renderFence(md) {
-  return (tokens, idx) => {
+function renderFence(md: MarkdownIt) {
+  return (tokens: Token[], idx: number) => {
     const token = tokens[idx];
     const info = token.info ? md.utils.unescapeAll(token.info).trim() : '';
     const lang = info.split(/\s+/g)[0] || '';
@@ -117,8 +119,8 @@ const MATH_ENV =
 /**
  * 模型常直接输出 \\begin{vmatrix} 而不加 $$；已在公式环境内则跳过。
  */
-export function wrapBareMathEnvs(src) {
-  return src.replace(MATH_ENV, (full, indent, env, body, offset) => {
+export function wrapBareMathEnvs(src: string) {
+  return src.replace(MATH_ENV, (full, indent: string, env: string, body: string, offset: number) => {
     const before = src.slice(0, offset);
     if ((before.match(/\$\$/g) || []).length % 2 === 1) return full;
     if (/\\\[\s*$/.test(before)) return full;
@@ -126,7 +128,7 @@ export function wrapBareMathEnvs(src) {
   });
 }
 
-export function createMarkdown(options = {}) {
+export function createMarkdown(options: { katex?: boolean } = {}) {
   const md = new MarkdownIt({
     html: false,
     linkify: true,
@@ -138,7 +140,7 @@ export function createMarkdown(options = {}) {
   }
   md.renderer.rules.fence = renderFence(md);
   const orig = md.render.bind(md);
-  md.render = (src, env) => orig(wrapBareMathEnvs(src || ''), env);
+  md.render = (src: string, env?: unknown) => orig(wrapBareMathEnvs(src || ''), env);
   return md;
 }
 

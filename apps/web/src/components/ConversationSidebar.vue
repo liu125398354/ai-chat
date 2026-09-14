@@ -5,151 +5,6 @@
   @updated 2026-09-14
   @description 会话列表：搜索、keyset 加载更多、条目多时窗口化渲染
 -->
-<script setup>
-import { computed, nextTick, ref, watch } from 'vue';
-import {
-  DeleteOutlined,
-  EditOutlined,
-  LogoutOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  SearchOutlined,
-  UnlockOutlined,
-} from '@ant-design/icons-vue';
-import BrandMark from '@/components/BrandMark.vue';
-import EmptyFrame from '@/components/EmptyFrame.vue';
-
-const ROW_HEIGHT = 44;
-const OVERSCAN = 8;
-const VIRTUAL_THRESHOLD = 40;
-
-const props = defineProps({
-  items: { type: Array, default: () => [] },
-  currentId: { type: String, default: '' },
-  loading: { type: Boolean, default: false },
-  loadingMore: { type: Boolean, default: false },
-  hasMore: { type: Boolean, default: false },
-  error: { type: String, default: '' },
-  username: { type: String, default: '' },
-  query: { type: String, default: '' },
-});
-
-const emit = defineEmits(['new', 'select', 'delete', 'rename', 'logout', 'change-password', 'search', 'load-more']);
-
-const editingId = ref('');
-const editingTitle = ref('');
-const renameInput = ref(null);
-const menuOpenId = ref('');
-const confirmingId = ref('');
-const searchDraft = ref(props.query);
-const listRef = ref(null);
-const scrollTop = ref(0);
-const viewportH = ref(400);
-let searchTimer = 0;
-
-watch(
-  () => props.query,
-  (q) => {
-    if (q !== searchDraft.value) {
-      searchDraft.value = q;
-    }
-  },
-);
-
-const useVirtual = computed(() => props.items.length > VIRTUAL_THRESHOLD);
-const startIndex = computed(() => {
-  if (!useVirtual.value) return 0;
-  return Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - OVERSCAN);
-});
-const endIndex = computed(() => {
-  if (!useVirtual.value) return props.items.length;
-  const visible = Math.ceil(viewportH.value / ROW_HEIGHT) + OVERSCAN * 2;
-  return Math.min(props.items.length, startIndex.value + visible);
-});
-const visibleItems = computed(() => props.items.slice(startIndex.value, endIndex.value));
-const padTop = computed(() => (useVirtual.value ? startIndex.value * ROW_HEIGHT : 0));
-const padBottom = computed(() =>
-  useVirtual.value ? Math.max(0, (props.items.length - endIndex.value) * ROW_HEIGHT) : 0,
-);
-
-function onSearchInput(e) {
-  searchDraft.value = e.target.value;
-  window.clearTimeout(searchTimer);
-  searchTimer = window.setTimeout(() => {
-    emit('search', searchDraft.value.trim());
-  }, 300);
-}
-
-function onListScroll(e) {
-  const el = e.target;
-  scrollTop.value = el.scrollTop;
-  viewportH.value = el.clientHeight;
-  if (props.hasMore && !props.loadingMore && el.scrollTop + el.clientHeight > el.scrollHeight - 72) {
-    emit('load-more');
-  }
-}
-
-function setRenameEl(el) {
-  renameInput.value = el;
-}
-
-function startRename(item) {
-  menuOpenId.value = '';
-  editingId.value = item.id;
-  editingTitle.value = item.title;
-  nextTick(() => {
-    renameInput.value?.focus?.();
-    renameInput.value?.select?.();
-  });
-}
-
-function cancelRename() {
-  editingId.value = '';
-  editingTitle.value = '';
-}
-
-function commitRename(item) {
-  const title = editingTitle.value.trim();
-  cancelRename();
-  if (!title || title === item.title) return;
-  emit('rename', item.id, title);
-}
-
-function onRenameKeydown(e, item) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    commitRename(item);
-  }
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    cancelRename();
-  }
-}
-
-function onOpenChange(open, id) {
-  if (confirmingId.value === id && open) {
-    return;
-  }
-  menuOpenId.value = open ? id : '';
-}
-
-function onRowLeave(id) {
-  if (confirmingId.value === id) {
-    confirmingId.value = '';
-  }
-}
-
-function onMenuClick({ key }, item) {
-  if (key === 'rename') {
-    startRename(item);
-  }
-  if (key === 'delete') {
-    menuOpenId.value = '';
-    confirmingId.value = item.id;
-    emit('delete', item.id);
-  }
-}
-</script>
 
 <template>
   <div class="side">
@@ -219,7 +74,7 @@ function onMenuClick({ key }, item) {
           v-if="editingId !== item.id"
           :open="menuOpenId === item.id"
           :trigger="['click']"
-          @openChange="(open) => onOpenChange(open, item.id)"
+          @openChange="(open: boolean) => onOpenChange(open, item.id)"
         >
           <button type="button" class="more-btn" title="更多" @click.stop>
             <MoreOutlined />
@@ -260,6 +115,154 @@ function onMenuClick({ key }, item) {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, nextTick, ref, watch } from 'vue';
+import type { PropType } from 'vue';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  LogoutOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  UnlockOutlined,
+} from '@ant-design/icons-vue';
+import BrandMark from '@/components/BrandMark.vue';
+import EmptyFrame from '@/components/EmptyFrame.vue';
+import type { Conversation } from '@/types/models';
+
+const ROW_HEIGHT = 44;
+const OVERSCAN = 8;
+const VIRTUAL_THRESHOLD = 40;
+
+const props = defineProps({
+  items: { type: Array as PropType<Conversation[]>, default: () => [] },
+  currentId: { type: String, default: '' },
+  loading: { type: Boolean, default: false },
+  loadingMore: { type: Boolean, default: false },
+  hasMore: { type: Boolean, default: false },
+  error: { type: String, default: '' },
+  username: { type: String, default: '' },
+  query: { type: String, default: '' },
+});
+
+const emit = defineEmits(['new', 'select', 'delete', 'rename', 'logout', 'change-password', 'search', 'load-more']);
+
+const editingId = ref('');
+const editingTitle = ref('');
+const renameInput = ref<HTMLInputElement | null>(null);
+const menuOpenId = ref('');
+const confirmingId = ref('');
+const searchDraft = ref(props.query);
+const listRef = ref<HTMLElement | null>(null);
+const scrollTop = ref(0);
+const viewportH = ref(400);
+let searchTimer = 0;
+
+watch(
+  () => props.query,
+  (q) => {
+    if (q !== searchDraft.value) {
+      searchDraft.value = q;
+    }
+  },
+);
+
+const useVirtual = computed(() => props.items.length > VIRTUAL_THRESHOLD);
+const startIndex = computed(() => {
+  if (!useVirtual.value) return 0;
+  return Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - OVERSCAN);
+});
+const endIndex = computed(() => {
+  if (!useVirtual.value) return props.items.length;
+  const visible = Math.ceil(viewportH.value / ROW_HEIGHT) + OVERSCAN * 2;
+  return Math.min(props.items.length, startIndex.value + visible);
+});
+const visibleItems = computed(() => props.items.slice(startIndex.value, endIndex.value));
+const padTop = computed(() => (useVirtual.value ? startIndex.value * ROW_HEIGHT : 0));
+const padBottom = computed(() =>
+  useVirtual.value ? Math.max(0, (props.items.length - endIndex.value) * ROW_HEIGHT) : 0,
+);
+
+function onSearchInput(e: Event) {
+  searchDraft.value = (e.target as HTMLInputElement).value;
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => {
+    emit('search', searchDraft.value.trim());
+  }, 300);
+}
+
+function onListScroll(e: Event) {
+  const el = e.target as HTMLElement;
+  scrollTop.value = el.scrollTop;
+  viewportH.value = el.clientHeight;
+  if (props.hasMore && !props.loadingMore && el.scrollTop + el.clientHeight > el.scrollHeight - 72) {
+    emit('load-more');
+  }
+}
+
+function setRenameEl(el: unknown) {
+  renameInput.value = el instanceof HTMLInputElement ? el : null;
+}
+
+function startRename(item: Conversation) {
+  menuOpenId.value = '';
+  editingId.value = item.id;
+  editingTitle.value = item.title;
+  nextTick(() => {
+    renameInput.value?.focus?.();
+    renameInput.value?.select?.();
+  });
+}
+
+function cancelRename() {
+  editingId.value = '';
+  editingTitle.value = '';
+}
+
+function commitRename(item: Conversation) {
+  const title = editingTitle.value.trim();
+  cancelRename();
+  if (!title || title === item.title) return;
+  emit('rename', item.id, title);
+}
+
+function onRenameKeydown(e: KeyboardEvent, item: Conversation) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    commitRename(item);
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    cancelRename();
+  }
+}
+
+function onOpenChange(open: boolean, id: string) {
+  if (confirmingId.value === id && open) {
+    return;
+  }
+  menuOpenId.value = open ? id : '';
+}
+
+function onRowLeave(id: string) {
+  if (confirmingId.value === id) {
+    confirmingId.value = '';
+  }
+}
+
+function onMenuClick({ key }: { key: string | number }, item: Conversation) {
+  if (key === 'rename') {
+    startRename(item);
+  }
+  if (key === 'delete') {
+    menuOpenId.value = '';
+    confirmingId.value = item.id;
+    emit('delete', item.id);
+  }
+}
+</script>
 
 <style scoped>
 .side {

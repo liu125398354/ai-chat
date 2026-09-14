@@ -5,17 +5,6 @@
   @updated 2026-09-14
   @description 夜空底：柔和暮色带 + 星座细线 + 近处网格；渐变 id 按实例隔离
 -->
-<script setup>
-import { useId } from 'vue';
-
-const nid = String(useId() || 'ns').replace(/[^a-zA-Z0-9_-]/g, '');
-const ids = {
-  sky: `ns-sky-${nid}`,
-  brand: `ns-brand-${nid}`,
-  dusk: `ns-dusk-${nid}`,
-  grid: `ns-grid-${nid}`,
-};
-</script>
 
 <template>
   <div class="night-sky" aria-hidden="true">
@@ -93,6 +82,18 @@ const ids = {
     </svg>
   </div>
 </template>
+
+<script setup lang="ts">
+import { useId } from 'vue';
+
+const nid = String(useId() || 'ns').replace(/[^a-zA-Z0-9_-]/g, '');
+const ids = {
+  sky: `ns-sky-${nid}`,
+  brand: `ns-brand-${nid}`,
+  dusk: `ns-dusk-${nid}`,
+  grid: `ns-grid-${nid}`,
+};
+</script>
 
 <style scoped>
 .night-sky {

@@ -1,5 +1,5 @@
 /**
- * @file chat.js
+ * @file chat.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-14
@@ -11,18 +11,20 @@ import { ERROR_CODES } from '@ai-chat/shared';
 import { listMessages } from '@/api/conversations';
 import { streamMessages } from '@/api/chat';
 import { useConversationsStore } from '@/stores/conversations';
+import type { ChatMessage, StreamError } from '@/types/models';
+import { errorMessage } from '@/utils/axios-error';
 import { MESSAGE_PAGE_SIZE } from '@/utils/pagination';
 
 export const useChatStore = defineStore('chat', () => {
-  const messages = ref([]);
+  const messages = ref<ChatMessage[]>([]);
   const loading = ref(false);
   const generating = ref(false);
   const error = ref('');
   const streamConversationId = ref('');
   const hasOlder = ref(false);
   const loadingOlder = ref(false);
-  let olderCursor = null;
-  let abortController = null;
+  let olderCursor: string | null = null;
+  let abortController: AbortController | null = null;
 
   function abortInFlight() {
     abortController?.abort();
@@ -39,7 +41,7 @@ export const useChatStore = defineStore('chat', () => {
     olderCursor = null;
   }
 
-  async function load(conversationId) {
+  async function load(conversationId: string) {
     if (generating.value && streamConversationId.value === conversationId) {
       return;
     }
@@ -63,14 +65,14 @@ export const useChatStore = defineStore('chat', () => {
       olderCursor = data.nextCursor || null;
       hasOlder.value = Boolean(olderCursor);
     } catch (err) {
-      error.value = err.response?.data?.message || err.message || '加载消息失败';
+      error.value = errorMessage(err, '加载消息失败');
     } finally {
       loading.value = false;
     }
   }
 
   /** 向上滚动时预加载更早消息；按 createdAt 拼到现有列表前面。 */
-  async function loadOlder(conversationId) {
+  async function loadOlder(conversationId: string) {
     if (!conversationId || !olderCursor || loadingOlder.value || generating.value) {
       return;
     }
@@ -89,7 +91,7 @@ export const useChatStore = defineStore('chat', () => {
       olderCursor = data.nextCursor || null;
       hasOlder.value = Boolean(olderCursor);
     } catch (err) {
-      error.value = err.response?.data?.message || err.message || '加载更早消息失败';
+      error.value = errorMessage(err, '加载更早消息失败');
     } finally {
       loadingOlder.value = false;
     }
@@ -98,7 +100,7 @@ export const useChatStore = defineStore('chat', () => {
   /**
    * 乐观插入后拉 SSE；创建失败不得调用本方法。generating 时直接返回。
    */
-  async function send(conversationId, content) {
+  async function send(conversationId: string, content: string) {
     if (generating.value) {
       error.value = '请等待当前回复完成';
       return;
@@ -106,7 +108,7 @@ export const useChatStore = defineStore('chat', () => {
     generating.value = true;
     streamConversationId.value = conversationId;
     error.value = '';
-    const tempUser = {
+    const tempUser: ChatMessage = {
       id: `temp-user-${Date.now()}`,
       conversationId,
       role: 'user',
@@ -115,7 +117,7 @@ export const useChatStore = defineStore('chat', () => {
       errorCode: null,
       createdAt: new Date().toISOString(),
     };
-    const tempAsst = {
+    const tempAsst: ChatMessage = {
       id: `temp-asst-${Date.now()}`,
       conversationId,
       role: 'assistant',
@@ -128,51 +130,47 @@ export const useChatStore = defineStore('chat', () => {
     abortController = new AbortController();
     const targetId = conversationId;
     try {
-      await streamMessages(
-        conversationId,
-        { content },
-        abortController.signal,
-        (event, data) => {
-          if (streamConversationId.value !== targetId) return;
-          if (event === 'meta') {
-            if (data.userMessageId) {
-              tempUser.id = data.userMessageId;
-            }
-            if (data.title) {
-              useConversationsStore().touch(targetId, data.title);
-            }
+      await streamMessages(conversationId, { content }, abortController.signal, (event, data) => {
+        if (streamConversationId.value !== targetId) return;
+        if (event === 'meta') {
+          if (typeof data.userMessageId === 'string') {
+            tempUser.id = data.userMessageId;
           }
-          if (event === 'delta' && typeof data.content === 'string' && data.content) {
-            tempAsst.content += data.content;
-            const idx = messages.value.findIndex((row) => row.id === tempAsst.id);
-            if (idx >= 0) {
-              messages.value[idx] = { ...messages.value[idx], content: tempAsst.content };
-            }
+          if (typeof data.title === 'string' && data.title) {
+            useConversationsStore().touch(targetId, data.title);
           }
-          if (event === 'done' && data.messageId) {
-            tempAsst.id = data.messageId;
-            tempAsst.status = 'completed';
-            tempAsst.errorCode = null;
+        }
+        if (event === 'delta' && typeof data.content === 'string' && data.content) {
+          tempAsst.content += data.content;
+          const idx = messages.value.findIndex((row) => row.id === tempAsst.id);
+          if (idx >= 0) {
+            messages.value[idx] = { ...messages.value[idx], content: tempAsst.content };
           }
-          if (event === 'error') {
-            tempAsst.status = 'failed';
-            tempAsst.errorCode = data.code || ERROR_CODES.QIANFAN_ERROR;
-            error.value = data.message || '生成失败';
-          }
-        },
-      );
+        }
+        if (event === 'done' && typeof data.messageId === 'string') {
+          tempAsst.id = data.messageId;
+          tempAsst.status = 'completed';
+          tempAsst.errorCode = null;
+        }
+        if (event === 'error') {
+          tempAsst.status = 'failed';
+          tempAsst.errorCode = typeof data.code === 'string' ? data.code : ERROR_CODES.QIANFAN_ERROR;
+          error.value = typeof data.message === 'string' ? data.message : '生成失败';
+        }
+      });
     } catch (err) {
-      if (err.name === 'AbortError') return;
-      if (err.status === 409) {
+      const streamErr = err as StreamError;
+      if (streamErr.name === 'AbortError') return;
+      if (streamErr.status === 409) {
         messages.value = messages.value.filter(
           (row) => row.id !== tempUser.id && row.id !== tempAsst.id,
         );
-        error.value = err.message || '请等待当前回复完成';
+        error.value = streamErr.message || '请等待当前回复完成';
         return;
       }
       tempAsst.status = 'failed';
-      tempAsst.errorCode = err.code || ERROR_CODES.INTERNAL_ERROR;
-      error.value = err.message || '发送失败';
+      tempAsst.errorCode = streamErr.code || ERROR_CODES.INTERNAL_ERROR;
+      error.value = errorMessage(err, '发送失败');
     } finally {
       if (streamConversationId.value === targetId) {
         generating.value = false;
@@ -186,7 +184,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /** done 后静默拉一页消息，校准临时 id / 半包。 */
-  async function reconcile(conversationId) {
+  async function reconcile(conversationId: string) {
     try {
       const data = await listMessages(conversationId, { limit: MESSAGE_PAGE_SIZE });
       if (useConversationsStore().currentId !== conversationId) {
@@ -205,7 +203,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function retryLastFailed(conversationId) {
+  async function retryLastFailed(conversationId: string) {
     const lastUser = [...messages.value].reverse().find((row) => row.role === 'user');
     if (!lastUser || generating.value) return;
     await send(conversationId, lastUser.content);

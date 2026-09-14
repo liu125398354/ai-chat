@@ -1,5 +1,5 @@
 /**
- * @file auth.js
+ * @file auth.ts
  * @author liunannan
  * @date 2026-09-13
  * @updated 2026-09-14
@@ -10,6 +10,7 @@ import { computed, ref } from 'vue';
 import * as authApi from '@/api/auth';
 import { useChatStore } from '@/stores/chat';
 import { useConversationsStore } from '@/stores/conversations';
+import type { AuthUser } from '@/types/models';
 import { encryptPassword } from '@/utils/password-crypto';
 
 const TOKEN_KEY = 'ai-chat-token';
@@ -17,11 +18,11 @@ const USER_KEY = 'ai-chat-user';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(sessionStorage.getItem(TOKEN_KEY) || '');
-  const user = ref(readUser());
+  const user = ref<AuthUser | null>(readUser());
 
   const isAuthenticated = computed(() => Boolean(token.value));
 
-  function persist(nextToken, nextUser) {
+  function persist(nextToken: string, nextUser: AuthUser) {
     token.value = nextToken;
     user.value = nextUser;
     sessionStorage.setItem(TOKEN_KEY, nextToken);
@@ -42,7 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** 拉取公钥后加密明文再登录。 */
-  async function login(username, password) {
+  async function login(username: string, password: string) {
     const publicKey = await authApi.getPublicKey();
     const cipher = await encryptPassword(password, publicKey);
     const data = await authApi.login({ username, password: cipher });
@@ -52,7 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** 拉取公钥后加密明文再注册；成功即写入登录态。 */
-  async function register(username, password) {
+  async function register(username: string, password: string) {
     const publicKey = await authApi.getPublicKey();
     const cipher = await encryptPassword(password, publicKey);
     const data = await authApi.register({ username, password: cipher });
@@ -62,7 +63,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /** 新旧密码均加密后提交。 */
-  async function changePassword(oldPassword, newPassword) {
+  async function changePassword(oldPassword: string, newPassword: string) {
     const publicKey = await authApi.getPublicKey();
     const [oldCipher, newCipher] = await Promise.all([
       encryptPassword(oldPassword, publicKey),
@@ -79,10 +80,10 @@ export const useAuthStore = defineStore('auth', () => {
   return { token, user, isAuthenticated, login, register, logout, changePassword, clearSession };
 });
 
-function readUser() {
+function readUser(): AuthUser | null {
   try {
     const raw = sessionStorage.getItem(USER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
   } catch {
     return null;
   }

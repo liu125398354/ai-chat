@@ -1,5 +1,5 @@
 /**
- * @file antd-workbench.js
+ * @file antd-workbench.ts
  * @author liunannan
  * @date 2026-09-14
  * @description 工作台才注册的 Antd 组件，避免登录首包带上 Layout/Menu/Modal
@@ -18,11 +18,12 @@ import {
   Modal,
   Skeleton,
 } from 'ant-design-vue';
+import type { App } from 'vue';
 
 let registered = false;
 
 /** 在 ChatView setup 里调用一次；直达 /chat 时也要带上登录同款表单组件。 */
-export function registerWorkbenchAntd(app) {
+export function registerWorkbenchAntd(app: App | undefined) {
   if (registered || !app) return;
   registered = true;
   app.use(Alert);

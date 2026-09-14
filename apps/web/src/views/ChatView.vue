@@ -5,362 +5,6 @@
   @updated 2026-09-14
   @description 工作台：夜空底与登录页同系；侧栏半透、气泡/输入条实底保证对比
 -->
-<script setup>
-import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { CopyOutlined, MenuOutlined, PauseOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons-vue';
-import { message as antdMessage, Modal } from 'ant-design-vue';
-import BrandMark from '@/components/BrandMark.vue';
-import NightSky from '@/components/NightSky.vue';
-import MarkdownView from '@/components/MarkdownView.vue';
-import ChangePasswordModal from '@/components/ChangePasswordModal.vue';
-import ConversationSidebar from '@/components/ConversationSidebar.vue';
-import EmptyFrame from '@/components/EmptyFrame.vue';
-import { registerWorkbenchAntd } from '@/plugins/antd-workbench';
-import { useAuthStore } from '@/stores/auth';
-import { useChatStore } from '@/stores/chat';
-import { useConversationsStore } from '@/stores/conversations';
-import { copyText } from '@/utils/clipboard';
-import { titleFromUserContent } from '@/utils/conversation-title';
-import { CONTEXT_MAX_MESSAGES } from '@/utils/context-window';
-import { readLastConversation, writeLastConversation } from '@/utils/last-conversation';
-
-registerWorkbenchAntd(getCurrentInstance()?.appContext.app);
-
-const auth = useAuthStore();
-const conversations = useConversationsStore();
-const chat = useChatStore();
-const router = useRouter();
-const route = useRoute();
-const draft = ref('');
-const composerKey = ref(0);
-const composerRef = ref(null);
-const messagesEl = ref(null);
-const sendError = ref('');
-const passwordOpen = ref(false);
-const drawerOpen = ref(false);
-const isMobile = ref(false);
-const copiedId = ref('');
-const enteringIds = ref({});
-let media = null;
-let copiedTimer = 0;
-let skipNextEnter = true;
-let prevMessageIds = [];
-let restoringOlder = false;
-const stickToBottom = ref(true);
-
-const emptyWorkbench = computed(
-  () =>
-    !conversations.currentId &&
-    !conversations.loading &&
-    conversations.items.length === 0 &&
-    !conversations.query,
-);
-
-const lastAssistant = computed(() => {
-  const list = chat.messages;
-  return list.length ? list[list.length - 1] : null;
-});
-
-const streamText = computed(() => lastAssistant.value?.content || '');
-
-const showContextHint = computed(() => chat.messages.length > CONTEXT_MAX_MESSAGES);
-
-const contextHintText = computed(
-  () => `仅使用最近 ${CONTEXT_MAX_MESSAGES} 条作为上下文`,
-);
-
-function syncViewport() {
-  isMobile.value = media.matches;
-  if (!media.matches) {
-    drawerOpen.value = false;
-  }
-}
-
-onMounted(async () => {
-  media = window.matchMedia('(max-width: 768px)');
-  syncViewport();
-  media.addEventListener('change', syncViewport);
-  await conversations.fetchList();
-  const nextId = await resolveResumeId();
-  if (nextId === conversations.currentId) {
-    if (nextId) {
-      await chat.load(nextId);
-      writeLastConversation(auth.user?.id, nextId);
-    } else {
-      chat.clear();
-    }
-    return;
-  }
-  conversations.select(nextId);
-});
-
-/** 优先 URL，其次该用户上次选中；已删除或不属于自己则回退列表最近一项。 */
-async function resolveResumeId() {
-  const fromQuery = typeof route.query.c === 'string' ? route.query.c : '';
-  const remembered = readLastConversation(auth.user?.id);
-  if (fromQuery && (await conversations.isOwned(fromQuery))) {
-    return fromQuery;
-  }
-  if (remembered && (await conversations.isOwned(remembered))) {
-    return remembered;
-  }
-  return conversations.items[0]?.id || '';
-}
-
-onUnmounted(() => {
-  media?.removeEventListener('change', syncViewport);
-  if (copiedTimer) window.clearTimeout(copiedTimer);
-});
-
-watch(
-  () => conversations.currentId,
-  async (id, prev) => {
-    if (id === prev) return;
-    if (id && auth.user?.id) {
-      writeLastConversation(auth.user.id, id);
-    }
-    drawerOpen.value = false;
-    enteringIds.value = {};
-    if (!id) {
-      skipNextEnter = false;
-      prevMessageIds = [];
-      chat.clear();
-      if (route.query.c) {
-        const query = { ...route.query };
-        delete query.c;
-        router.replace({ query });
-      }
-      return;
-    }
-    if (chat.generating && chat.streamConversationId === id) {
-      router.replace({ query: { ...route.query, c: id } });
-      return;
-    }
-    skipNextEnter = true;
-    await chat.load(id);
-    router.replace({ query: { ...route.query, c: id } });
-  },
-);
-
-watch(
-  () => chat.generating,
-  async (now, was) => {
-    if (was && !now) {
-      await conversations.fetchList({ silent: true });
-    }
-  },
-);
-
-watch(
-  () => [chat.messages.length, streamText.value],
-  async () => {
-    if (restoringOlder) return;
-    if (!stickToBottom.value) return;
-    await nextTick();
-    if (messagesEl.value) {
-      messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
-    }
-  },
-);
-
-watch(
-  () => [chat.loading, chat.messages.map((msg) => msg.id)],
-  ([loading, ids]) => {
-    if (skipNextEnter) {
-      if (loading) return;
-      skipNextEnter = false;
-      prevMessageIds = ids;
-      return;
-    }
-    if (ids.length > prevMessageIds.length) {
-      const added = ids.filter((id) => !prevMessageIds.includes(id));
-      if (added.length) {
-        const next = { ...enteringIds.value };
-        added.forEach((id) => {
-          next[id] = true;
-        });
-        enteringIds.value = next;
-        window.setTimeout(() => {
-          const cleared = { ...enteringIds.value };
-          added.forEach((id) => {
-            delete cleared[id];
-          });
-          enteringIds.value = cleared;
-        }, 200);
-      }
-    }
-    prevMessageIds = ids;
-  },
-);
-
-/** 草稿新对话：无 currentId、无消息、未生成。 */
-function isDraftNewChat() {
-  return Boolean(
-    !conversations.currentId && !chat.loading && !chat.generating && chat.messages.length === 0,
-  );
-}
-
-async function onNewChat() {
-  draft.value = '';
-  composerKey.value += 1;
-  drawerOpen.value = false;
-  if (conversations.query) {
-    await conversations.setQuery('');
-  }
-  if (!isDraftNewChat()) {
-    conversations.select('');
-  }
-  await nextTick();
-  composerRef.value?.focus?.();
-}
-
-function onSelect(id) {
-  conversations.select(id);
-}
-
-async function onSearch(q) {
-  await conversations.setQuery(q);
-}
-
-async function onLoadMore() {
-  await conversations.fetchList({ append: true });
-}
-
-async function onMessagesScroll() {
-  const el = messagesEl.value;
-  if (!el) return;
-  stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-  if (el.scrollTop > 48 || !chat.hasOlder || chat.loadingOlder || restoringOlder) {
-    return;
-  }
-  restoringOlder = true;
-  skipNextEnter = true;
-  const prevHeight = el.scrollHeight;
-  const prevTop = el.scrollTop;
-  try {
-    await chat.loadOlder(conversations.currentId);
-    await nextTick();
-    el.scrollTop = el.scrollHeight - prevHeight + prevTop;
-  } finally {
-    restoringOlder = false;
-  }
-}
-
-async function onRename(id, title) {
-  try {
-    await conversations.rename(id, title);
-  } catch (err) {
-    antdMessage.error(err.response?.data?.message || '重命名失败');
-  }
-}
-
-async function onDelete(id) {
-  await nextTick();
-  Modal.confirm({
-    title: '删除会话',
-    content: '删除该会话后不可恢复，确认删除？',
-    okText: '删除',
-    okType: 'danger',
-    cancelText: '取消',
-    zIndex: 2000,
-    async onOk() {
-      await conversations.remove(id);
-    },
-  });
-}
-
-async function onLogout() {
-  chat.abortInFlight();
-  await auth.logout();
-  await router.push({ name: 'login' });
-}
-
-function onStop() {
-  chat.abortInFlight();
-}
-
-async function onSend() {
-  sendError.value = '';
-  const text = draft.value.trim();
-  if (!text || chat.generating) return;
-  if (text.length > 8000) {
-    sendError.value = '单条消息最多 8000 字';
-    return;
-  }
-  const payload = text;
-  draft.value = '';
-  composerKey.value += 1;
-  let conversationId = conversations.currentId;
-  if (!conversationId) {
-    try {
-      const created = await conversations.create();
-      conversationId = created.id;
-    } catch (err) {
-      draft.value = payload;
-      sendError.value = err.response?.data?.message || '创建会话失败';
-      antdMessage.error(sendError.value);
-      return;
-    }
-  }
-  if (conversations.isDefaultTitle(conversationId)) {
-    conversations.touch(conversationId, titleFromUserContent(payload));
-  } else {
-    conversations.touch(conversationId);
-  }
-  const sending = chat.send(conversationId, payload);
-  if (conversations.currentId !== conversationId) {
-    conversations.select(conversationId);
-  }
-  await sending;
-}
-
-async function onRetry() {
-  if (!conversations.currentId || chat.generating) return;
-  await chat.retryLastFailed(conversations.currentId);
-}
-
-function markCopied(id) {
-  copiedId.value = id;
-  if (copiedTimer) window.clearTimeout(copiedTimer);
-  copiedTimer = window.setTimeout(() => {
-    copiedId.value = '';
-    copiedTimer = 0;
-  }, 1500);
-}
-
-/** 复制单条消息原文（Markdown/纯文本）。 */
-async function copyMessage(msg) {
-  const ok = await copyText(msg.content || '');
-  if (!ok) {
-    antdMessage.error('复制失败');
-    return;
-  }
-  markCopied(msg.id);
-}
-
-/** 按角色拼接当前会话全部消息。 */
-async function copyThread() {
-  const text = chat.messages
-    .map((msg) => `${msg.role === 'user' ? '用户' : '助手'}\n${msg.content || ''}`)
-    .join('\n\n---\n\n');
-  const ok = await copyText(text);
-  if (!ok) {
-    antdMessage.error('复制失败');
-    return;
-  }
-  markCopied('thread');
-}
-
-function onKeydown(e) {
-  if (e.isComposing || e.keyCode === 229) return;
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    e.stopPropagation();
-    onSend();
-  }
-}
-</script>
 
 <template>
   <div class="workbench-shell">
@@ -461,7 +105,7 @@ function onKeydown(e) {
             <MarkdownView
               v-else
               :source="msg.content"
-              :live="chat.generating && lastAssistant && lastAssistant.id === msg.id"
+              :live="Boolean(chat.generating && lastAssistant && lastAssistant.id === msg.id)"
             />
             <div v-if="msg.status === 'failed'" class="fail-row">
               <a-alert type="error" :message="chat.error || msg.errorCode || '生成失败'" show-icon />
@@ -525,6 +169,366 @@ function onKeydown(e) {
   <ChangePasswordModal v-model:open="passwordOpen" />
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { CopyOutlined, MenuOutlined, PauseOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons-vue';
+import { message as antdMessage, Modal } from 'ant-design-vue';
+import BrandMark from '@/components/BrandMark.vue';
+import NightSky from '@/components/NightSky.vue';
+import MarkdownView from '@/components/MarkdownView.vue';
+import ChangePasswordModal from '@/components/ChangePasswordModal.vue';
+import ConversationSidebar from '@/components/ConversationSidebar.vue';
+import EmptyFrame from '@/components/EmptyFrame.vue';
+import { registerWorkbenchAntd } from '@/plugins/antd-workbench';
+import { useAuthStore } from '@/stores/auth';
+import { useChatStore } from '@/stores/chat';
+import { useConversationsStore } from '@/stores/conversations';
+import { copyText } from '@/utils/clipboard';
+import { titleFromUserContent } from '@/utils/conversation-title';
+import { CONTEXT_MAX_MESSAGES } from '@/utils/context-window';
+import { readLastConversation, writeLastConversation } from '@/utils/last-conversation';
+import { errorMessage } from '@/utils/axios-error';
+import type { ChatMessage } from '@/types/models';
+
+registerWorkbenchAntd(getCurrentInstance()?.appContext.app);
+
+const auth = useAuthStore();
+const conversations = useConversationsStore();
+const chat = useChatStore();
+const router = useRouter();
+const route = useRoute();
+const draft = ref('');
+const composerKey = ref(0);
+const composerRef = ref<HTMLTextAreaElement | null>(null);
+const messagesEl = ref<HTMLElement | null>(null);
+const sendError = ref('');
+const passwordOpen = ref(false);
+const drawerOpen = ref(false);
+const isMobile = ref(false);
+const copiedId = ref('');
+const enteringIds = ref<Record<string, boolean>>({});
+let media: MediaQueryList | null = null;
+let copiedTimer = 0;
+let skipNextEnter = true;
+let prevMessageIds: string[] = [];
+let restoringOlder = false;
+const stickToBottom = ref(true);
+
+const emptyWorkbench = computed(
+  () =>
+    !conversations.currentId &&
+    !conversations.loading &&
+    conversations.items.length === 0 &&
+    !conversations.query,
+);
+
+const lastAssistant = computed(() => {
+  const list = chat.messages;
+  return list.length ? list[list.length - 1] : null;
+});
+
+const streamText = computed(() => lastAssistant.value?.content || '');
+
+const showContextHint = computed(() => chat.messages.length > CONTEXT_MAX_MESSAGES);
+
+const contextHintText = computed(
+  () => `仅使用最近 ${CONTEXT_MAX_MESSAGES} 条作为上下文`,
+);
+
+function syncViewport() {
+  if (!media) return;
+  isMobile.value = media.matches;
+  if (!media.matches) {
+    drawerOpen.value = false;
+  }
+}
+
+onMounted(async () => {
+  media = window.matchMedia('(max-width: 768px)');
+  syncViewport();
+  media.addEventListener('change', syncViewport);
+  await conversations.fetchList();
+  const nextId = await resolveResumeId();
+  if (nextId === conversations.currentId) {
+    if (nextId) {
+      await chat.load(nextId);
+      writeLastConversation(auth.user?.id, nextId);
+    } else {
+      chat.clear();
+    }
+    return;
+  }
+  conversations.select(nextId);
+});
+
+/** 优先 URL，其次该用户上次选中；已删除或不属于自己则回退列表最近一项。 */
+async function resolveResumeId() {
+  const fromQuery = typeof route.query.c === 'string' ? route.query.c : '';
+  const remembered = readLastConversation(auth.user?.id);
+  if (fromQuery && (await conversations.isOwned(fromQuery))) {
+    return fromQuery;
+  }
+  if (remembered && (await conversations.isOwned(remembered))) {
+    return remembered;
+  }
+  return conversations.items[0]?.id || '';
+}
+
+onUnmounted(() => {
+  media?.removeEventListener('change', syncViewport);
+  if (copiedTimer) window.clearTimeout(copiedTimer);
+});
+
+watch(
+  () => conversations.currentId,
+  async (id, prev) => {
+    if (id === prev) return;
+    if (id && auth.user?.id) {
+      writeLastConversation(auth.user.id, id);
+    }
+    drawerOpen.value = false;
+    enteringIds.value = {};
+    if (!id) {
+      skipNextEnter = false;
+      prevMessageIds = [];
+      chat.clear();
+      if (route.query.c) {
+        const query = { ...route.query };
+        delete query.c;
+        router.replace({ query });
+      }
+      return;
+    }
+    if (chat.generating && chat.streamConversationId === id) {
+      router.replace({ query: { ...route.query, c: id } });
+      return;
+    }
+    skipNextEnter = true;
+    await chat.load(id);
+    router.replace({ query: { ...route.query, c: id } });
+  },
+);
+
+watch(
+  () => chat.generating,
+  async (now, was) => {
+    if (was && !now) {
+      await conversations.fetchList({ silent: true });
+    }
+  },
+);
+
+watch(
+  () => [chat.messages.length, streamText.value],
+  async () => {
+    if (restoringOlder) return;
+    if (!stickToBottom.value) return;
+    await nextTick();
+    if (messagesEl.value) {
+      messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
+    }
+  },
+);
+
+watch(
+  () => [chat.loading, chat.messages.map((msg) => msg.id)] as [boolean, string[]],
+  ([loading, ids]) => {
+    if (skipNextEnter) {
+      if (loading) return;
+      skipNextEnter = false;
+      prevMessageIds = ids;
+      return;
+    }
+    if (ids.length > prevMessageIds.length) {
+      const added = ids.filter((id) => !prevMessageIds.includes(id));
+      if (added.length) {
+        const next = { ...enteringIds.value };
+        added.forEach((id) => {
+          next[id] = true;
+        });
+        enteringIds.value = next;
+        window.setTimeout(() => {
+          const cleared = { ...enteringIds.value };
+          added.forEach((id) => {
+            delete cleared[id];
+          });
+          enteringIds.value = cleared;
+        }, 200);
+      }
+    }
+    prevMessageIds = ids;
+  },
+);
+
+/** 草稿新对话：无 currentId、无消息、未生成。 */
+function isDraftNewChat() {
+  return Boolean(
+    !conversations.currentId && !chat.loading && !chat.generating && chat.messages.length === 0,
+  );
+}
+
+async function onNewChat() {
+  draft.value = '';
+  composerKey.value += 1;
+  drawerOpen.value = false;
+  if (conversations.query) {
+    await conversations.setQuery('');
+  }
+  if (!isDraftNewChat()) {
+    conversations.select('');
+  }
+  await nextTick();
+  composerRef.value?.focus?.();
+}
+
+function onSelect(id: string) {
+  conversations.select(id);
+}
+
+async function onSearch(q: string) {
+  await conversations.setQuery(q);
+}
+
+async function onLoadMore() {
+  await conversations.fetchList({ append: true });
+}
+
+async function onMessagesScroll() {
+  const el = messagesEl.value;
+  if (!el) return;
+  stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  if (el.scrollTop > 48 || !chat.hasOlder || chat.loadingOlder || restoringOlder) {
+    return;
+  }
+  restoringOlder = true;
+  skipNextEnter = true;
+  const prevHeight = el.scrollHeight;
+  const prevTop = el.scrollTop;
+  try {
+    await chat.loadOlder(conversations.currentId);
+    await nextTick();
+    el.scrollTop = el.scrollHeight - prevHeight + prevTop;
+  } finally {
+    restoringOlder = false;
+  }
+}
+
+async function onRename(id: string, title: string) {
+  try {
+    await conversations.rename(id, title);
+  } catch (err) {
+    antdMessage.error(errorMessage(err, '重命名失败'));
+  }
+}
+
+async function onDelete(id: string) {
+  await nextTick();
+  Modal.confirm({
+    title: '删除会话',
+    content: '删除该会话后不可恢复，确认删除？',
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    zIndex: 2000,
+    async onOk() {
+      await conversations.remove(id);
+    },
+  });
+}
+
+async function onLogout() {
+  chat.abortInFlight();
+  await auth.logout();
+  await router.push({ name: 'login' });
+}
+
+function onStop() {
+  chat.abortInFlight();
+}
+
+async function onSend() {
+  sendError.value = '';
+  const text = draft.value.trim();
+  if (!text || chat.generating) return;
+  if (text.length > 8000) {
+    sendError.value = '单条消息最多 8000 字';
+    return;
+  }
+  const payload = text;
+  draft.value = '';
+  composerKey.value += 1;
+  let conversationId = conversations.currentId;
+  if (!conversationId) {
+    try {
+      const created = await conversations.create();
+      conversationId = created.id;
+    } catch (err) {
+      draft.value = payload;
+      sendError.value = errorMessage(err, '创建会话失败');
+      antdMessage.error(sendError.value);
+      return;
+    }
+  }
+  if (conversations.isDefaultTitle(conversationId)) {
+    conversations.touch(conversationId, titleFromUserContent(payload));
+  } else {
+    conversations.touch(conversationId);
+  }
+  const sending = chat.send(conversationId, payload);
+  if (conversations.currentId !== conversationId) {
+    conversations.select(conversationId);
+  }
+  await sending;
+}
+
+async function onRetry() {
+  if (!conversations.currentId || chat.generating) return;
+  await chat.retryLastFailed(conversations.currentId);
+}
+
+function markCopied(id: string) {
+  copiedId.value = id;
+  if (copiedTimer) window.clearTimeout(copiedTimer);
+  copiedTimer = window.setTimeout(() => {
+    copiedId.value = '';
+    copiedTimer = 0;
+  }, 1500);
+}
+
+/** 复制单条消息原文（Markdown/纯文本）。 */
+async function copyMessage(msg: ChatMessage) {
+  const ok = await copyText(msg.content || '');
+  if (!ok) {
+    antdMessage.error('复制失败');
+    return;
+  }
+  markCopied(msg.id);
+}
+
+/** 按角色拼接当前会话全部消息。 */
+async function copyThread() {
+  const text = chat.messages
+    .map((msg) => `${msg.role === 'user' ? '用户' : '助手'}\n${msg.content || ''}`)
+    .join('\n\n---\n\n');
+  const ok = await copyText(text);
+  if (!ok) {
+    antdMessage.error('复制失败');
+    return;
+  }
+  markCopied('thread');
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.isComposing || e.keyCode === 229) return;
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    e.stopPropagation();
+    onSend();
+  }
+}
+</script>
 
 <style scoped>
 .workbench-shell {

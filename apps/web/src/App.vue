@@ -5,9 +5,6 @@
   @updated 2026-09-13
   @description 根组件：Ant Design 中文语言包、主题与路由出口
 -->
-<script setup>
-import zhCN from 'ant-design-vue/es/locale/zh_CN';
-</script>
 
 <template>
   <a-config-provider
@@ -22,3 +19,7 @@ import zhCN from 'ant-design-vue/es/locale/zh_CN';
     <router-view />
   </a-config-provider>
 </template>
+
+<script setup lang="ts">
+import zhCN from 'ant-design-vue/es/locale/zh_CN';
+</script>

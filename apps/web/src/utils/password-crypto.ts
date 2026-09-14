@@ -1,15 +1,11 @@
 /**
- * @file password-crypto.js
+ * @file password-crypto.ts
  * @author liunannan
  * @date 2026-09-13
  * @description 用服务端 RSA 公钥（OAEP+SHA-256）加密密码后再传输
  */
 
-/**
- * @param {string} pem
- * @returns {ArrayBuffer}
- */
-function pemToArrayBuffer(pem) {
+function pemToArrayBuffer(pem: string) {
   const b64 = pem
     .replace('-----BEGIN PUBLIC KEY-----', '')
     .replace('-----END PUBLIC KEY-----', '')
@@ -22,11 +18,7 @@ function pemToArrayBuffer(pem) {
   return bytes.buffer;
 }
 
-/**
- * @param {ArrayBuffer} buffer
- * @returns {string}
- */
-function bufferToBase64(buffer) {
+function bufferToBase64(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.length; i += 1) {
@@ -35,12 +27,8 @@ function bufferToBase64(buffer) {
   return btoa(binary);
 }
 
-/**
- * 将明文密码加密为 Base64 密文。禁止把明文写入日志。
- * @param {string} plain
- * @param {string} publicKeyPem
- */
-export async function encryptPassword(plain, publicKeyPem) {
+/** 将明文密码加密为 Base64 密文。禁止把明文写入日志。 */
+export async function encryptPassword(plain: string, publicKeyPem: string) {
   const key = await crypto.subtle.importKey(
     'spki',
     pemToArrayBuffer(publicKeyPem),

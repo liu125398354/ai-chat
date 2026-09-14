@@ -5,7 +5,14 @@
   @updated 2026-09-14
   @description 助手 Markdown：KaTeX 公式 + GitHub 风格 + 代码复制；流式跳过 KaTeX
 -->
-<script setup>
+
+<template>
+  <div class="md-wrap">
+    <div class="md-body markdown-body" v-html="html" @click="onBodyClick" />
+  </div>
+</template>
+
+<script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import DOMPurify from 'dompurify';
 import { markdown as md, markdownLive } from '@/utils/markdown';
@@ -21,9 +28,10 @@ function ensureKatexPurifyHook() {
   katexHooked = true;
   DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
     if (data.attrName !== 'style') return;
+    const el = node as Element;
     const inKatex =
-      node.classList?.contains('katex') ||
-      (typeof node.closest === 'function' && node.closest('.katex'));
+      el.classList?.contains('katex') ||
+      (typeof el.closest === 'function' && el.closest('.katex'));
     if (inKatex) {
       data.forceKeepAttr = true;
     }
@@ -70,29 +78,30 @@ const VOID_TAGS = new Set(['HR', 'BR', 'IMG']);
 /**
  * 取最后一个可插入行内节点的宿主，让流式光标跟在末字后。
  */
-function lastInlineHost(root) {
-  let node = root;
+function lastInlineHost(root: HTMLElement) {
+  let node: Node = root;
   while (node?.nodeType === 1) {
-    const kids = [...node.childNodes].filter((child) => {
-      if (child.nodeType === 1 && child.classList?.contains('caret')) return false;
-      if (child.nodeType === 3 && !child.textContent.trim()) return false;
+    const el = node as HTMLElement;
+    const kids = [...el.childNodes].filter((child) => {
+      if (child.nodeType === 1 && (child as HTMLElement).classList?.contains('caret')) return false;
+      if (child.nodeType === 3 && !child.textContent?.trim()) return false;
       return true;
     });
-    if (!kids.length) return node;
+    if (!kids.length) return el;
     const last = kids[kids.length - 1];
-    if (last.nodeType === Node.TEXT_NODE) return node;
+    if (last.nodeType === Node.TEXT_NODE) return el;
     if (last.nodeType === Node.ELEMENT_NODE) {
-      if (VOID_TAGS.has(last.tagName)) return node;
+      if (VOID_TAGS.has((last as HTMLElement).tagName)) return el;
       node = last;
       continue;
     }
-    return node;
+    return el;
   }
   return root;
 }
 
 /** 把闪烁光标插进消毒后的 HTML 末字后面，与 v-html 同一拍更新。 */
-function withLiveCaret(html) {
+function withLiveCaret(html: string) {
   const wrap = document.createElement('div');
   wrap.innerHTML = html || '';
   const caret = document.createElement('span');
@@ -115,9 +124,10 @@ const html = computed(() => {
 });
 
 /** 代码块「复制」走事件委托，避免把源码放进属性。 */
-async function onBodyClick(event) {
-  const btn = event.target.closest?.('.code-copy');
-  if (!btn || !event.currentTarget.contains(btn)) return;
+async function onBodyClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null;
+  const btn = target?.closest?.('.code-copy');
+  if (!btn || !(event.currentTarget as HTMLElement).contains(btn)) return;
   event.preventDefault();
   const block = btn.closest('.code-block');
   const text = block?.querySelector('pre')?.innerText ?? '';
@@ -131,12 +141,6 @@ async function onBodyClick(event) {
   }, 1500);
 }
 </script>
-
-<template>
-  <div class="md-wrap">
-    <div class="md-body markdown-body" v-html="html" @click="onBodyClick" />
-  </div>
-</template>
 
 <style scoped>
 .md-wrap {

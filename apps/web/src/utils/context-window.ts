@@ -1,5 +1,5 @@
 /**
- * @file context-window.js
+ * @file context-window.ts
  * @author liunannan
  * @date 2026-09-14
  * @updated 2026-09-14

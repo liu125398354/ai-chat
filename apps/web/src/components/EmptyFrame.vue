@@ -5,6 +5,7 @@
   @updated 2026-09-14
   @description 空态：空对话气泡，表示还没有内容
 -->
+
 <template>
   <div class="empty-frame" aria-hidden="true">
     <svg class="empty-icon" viewBox="0 0 72 64" fill="none" xmlns="http://www.w3.org/2000/svg">

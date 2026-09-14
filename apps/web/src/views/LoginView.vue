@@ -5,95 +5,6 @@
   @updated 2026-09-14
   @description 登录/注册页：同一套 RSA 加密提交；夜空底与品牌标
 -->
-<script setup>
-import { computed, getCurrentInstance, onMounted, reactive, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { LockOutlined, LoginOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons-vue';
-import BrandMark from '@/components/BrandMark.vue';
-import NightSky from '@/components/NightSky.vue';
-import { useAuthStore } from '@/stores/auth';
-import { registerLoginAntd } from '@/plugins/antd-login';
-
-registerLoginAntd(getCurrentInstance()?.appContext.app);
-
-const form = reactive({
-  username: '',
-  password: '',
-  confirmPassword: '',
-});
-const submitting = ref(false);
-const error = ref('');
-const auth = useAuthStore();
-const router = useRouter();
-const route = useRoute();
-
-const isRegister = computed(() => route.name === 'register');
-
-const rules = computed(() => ({
-  username: [{ required: true, message: '请输入用户名' }],
-  password: isRegister.value
-    ? [
-        { required: true, message: '请输入密码' },
-        { min: 8, max: 128, message: '密码长度为 8–128 个字符' },
-      ]
-    : [{ required: true, message: '请输入密码' }],
-  confirmPassword: [
-    { required: true, message: '请再次输入密码' },
-    {
-      validator: async (_rule, value) => {
-        if (value && value !== form.password) {
-          throw new Error('两次输入的密码不一致');
-        }
-      },
-    },
-  ],
-}));
-
-watch(isRegister, () => {
-  error.value = '';
-  form.confirmPassword = '';
-});
-
-async function onSubmit() {
-  error.value = '';
-  submitting.value = true;
-  try {
-    if (isRegister.value) {
-      await auth.register(form.username.trim(), form.password);
-    } else {
-      await auth.login(form.username, form.password);
-    }
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/chat';
-    await router.replace(redirect);
-  } catch (err) {
-    error.value =
-      err.response?.data?.message || (isRegister.value ? '注册失败' : '用户名或密码错误');
-  } finally {
-    submitting.value = false;
-  }
-}
-
-function toggleMode() {
-  router.replace({
-    name: isRegister.value ? 'login' : 'register',
-    query: route.query.redirect ? { redirect: route.query.redirect } : undefined,
-  });
-}
-
-/** 填表时空闲预取工作台；Markdown 栈随 ChatView 静态依赖一并拉取。 */
-function prefetchChatWorkbench() {
-  import('@/views/ChatView.vue');
-}
-
-onMounted(() => {
-  const ric = window.requestIdleCallback;
-  if (typeof ric === 'function') {
-    ric(prefetchChatWorkbench, { timeout: 2500 });
-  } else {
-    window.setTimeout(prefetchChatWorkbench, 400);
-  }
-});
-</script>
 
 <template>
   <div class="login-page">
@@ -169,6 +80,96 @@ onMounted(() => {
     </footer>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, getCurrentInstance, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { LockOutlined, LoginOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons-vue';
+import BrandMark from '@/components/BrandMark.vue';
+import NightSky from '@/components/NightSky.vue';
+import { useAuthStore } from '@/stores/auth';
+import { registerLoginAntd } from '@/plugins/antd-login';
+import { errorMessage } from '@/utils/axios-error';
+
+registerLoginAntd(getCurrentInstance()?.appContext.app);
+
+const form = reactive({
+  username: '',
+  password: '',
+  confirmPassword: '',
+});
+const submitting = ref(false);
+const error = ref('');
+const auth = useAuthStore();
+const router = useRouter();
+const route = useRoute();
+
+const isRegister = computed(() => route.name === 'register');
+
+const rules = computed(() => ({
+  username: [{ required: true, message: '请输入用户名' }],
+  password: isRegister.value
+    ? [
+        { required: true, message: '请输入密码' },
+        { min: 8, max: 128, message: '密码长度为 8–128 个字符' },
+      ]
+    : [{ required: true, message: '请输入密码' }],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码' },
+    {
+      validator: async (_rule: unknown, value: string) => {
+        if (value && value !== form.password) {
+          throw new Error('两次输入的密码不一致');
+        }
+      },
+    },
+  ],
+}));
+
+watch(isRegister, () => {
+  error.value = '';
+  form.confirmPassword = '';
+});
+
+async function onSubmit() {
+  error.value = '';
+  submitting.value = true;
+  try {
+    if (isRegister.value) {
+      await auth.register(form.username.trim(), form.password);
+    } else {
+      await auth.login(form.username, form.password);
+    }
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/chat';
+    await router.replace(redirect);
+  } catch (err) {
+    error.value = errorMessage(err, isRegister.value ? '注册失败' : '用户名或密码错误');
+  } finally {
+    submitting.value = false;
+  }
+}
+
+function toggleMode() {
+  router.replace({
+    name: isRegister.value ? 'login' : 'register',
+    query: route.query.redirect ? { redirect: route.query.redirect } : undefined,
+  });
+}
+
+/** 填表时空闲预取工作台；Markdown 栈随 ChatView 静态依赖一并拉取。 */
+function prefetchChatWorkbench() {
+  import('@/views/ChatView.vue');
+}
+
+onMounted(() => {
+  const ric = window.requestIdleCallback;
+  if (typeof ric === 'function') {
+    ric(prefetchChatWorkbench, { timeout: 2500 });
+  } else {
+    window.setTimeout(prefetchChatWorkbench, 400);
+  }
+});
+</script>
 
 <style scoped>
 .login-page {

@@ -4,11 +4,6 @@
   @date 2026-09-14
   @description 品牌标：夜窗几何 + 一枚信号点，不作吉祥物
 -->
-<script setup>
-defineProps({
-  size: { type: Number, default: 28 },
-});
-</script>
 
 <template>
   <svg
@@ -27,10 +22,13 @@ defineProps({
   </svg>
 </template>
 
+<script setup lang="ts">
+withDefaults(defineProps<{ size?: number }>(), { size: 28 });
+</script>
+
 <style scoped>
 .brand-mark {
   display: block;
   flex-shrink: 0;
 }
 </style>
-
