@@ -2,7 +2,7 @@
   @file ChatView.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-14
+  @updated 2026-09-16
   @description 工作台：夜空底与登录页同系；侧栏半透、气泡/输入条实底保证对比
 -->
 
@@ -73,7 +73,14 @@
         <BrandMark :size="20" />
         <span>AI Chat</span>
       </a-layout-header>
-      <div ref="messagesEl" class="messages thin-scroll thin-scroll-dark" @scroll="onMessagesScroll">
+      <div
+        ref="messagesEl"
+        class="messages thin-scroll thin-scroll-dark"
+        @scroll="onMessagesScroll"
+        @wheel="onMessagesWheel"
+        @touchmove="onMessagesTouchMove"
+      >
+        <div ref="messagesInnerEl" class="messages-stack">
         <div v-if="chat.messages.length" class="thread-bar">
           <button type="button" class="copy-btn" @click="copyThread">
             <CopyOutlined />
@@ -128,6 +135,7 @@
           class="alert-gap"
         />
         <a-alert v-if="sendError" type="error" :message="sendError" show-icon class="alert-gap" />
+        </div>
       </div>
       <div class="composer">
         <a-alert
@@ -203,6 +211,7 @@ const draft = ref('');
 const composerKey = ref(0);
 const composerRef = ref<HTMLTextAreaElement | null>(null);
 const messagesEl = ref<HTMLElement | null>(null);
+const messagesInnerEl = ref<HTMLElement | null>(null);
 const sendError = ref('');
 const passwordOpen = ref(false);
 const drawerOpen = ref(false);
@@ -214,7 +223,39 @@ let copiedTimer = 0;
 let skipNextEnter = true;
 let prevMessageIds: string[] = [];
 let restoringOlder = false;
+let messagesResizeObserver: ResizeObserver | null = null;
+let suppressStickFromProgrammatic = false;
 const stickToBottom = ref(true);
+const NEAR_BOTTOM_PX = 80;
+
+function distanceFromBottom(el: HTMLElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight;
+}
+
+function isNearBottom(el: HTMLElement) {
+  return distanceFromBottom(el) < NEAR_BOTTOM_PX;
+}
+
+/** 仅在用户贴底时跟滚；程序滚动不改 stick，避免和用户上滑抢位置。 */
+function pinScrollToBottom() {
+  const el = messagesEl.value;
+  if (!el || !stickToBottom.value) return;
+  suppressStickFromProgrammatic = true;
+  el.scrollTop = el.scrollHeight;
+  requestAnimationFrame(() => {
+    const next = messagesEl.value;
+    if (next && stickToBottom.value) {
+      next.scrollTop = next.scrollHeight;
+    }
+    suppressStickFromProgrammatic = false;
+  });
+}
+
+function syncStickFromUserScroll() {
+  const el = messagesEl.value;
+  if (!el) return;
+  stickToBottom.value = isNearBottom(el);
+}
 
 const emptyWorkbench = computed(
   () =>
@@ -249,6 +290,13 @@ onMounted(async () => {
   media = window.matchMedia('(max-width: 768px)');
   syncViewport();
   media.addEventListener('change', syncViewport);
+  messagesResizeObserver = new ResizeObserver(() => {
+    if (restoringOlder || !stickToBottom.value) return;
+    pinScrollToBottom();
+  });
+  if (messagesInnerEl.value) {
+    messagesResizeObserver.observe(messagesInnerEl.value);
+  }
   await conversations.fetchList();
   const nextId = await resolveResumeId();
   if (nextId === conversations.currentId) {
@@ -278,6 +326,8 @@ async function resolveResumeId() {
 
 onUnmounted(() => {
   media?.removeEventListener('change', syncViewport);
+  messagesResizeObserver?.disconnect();
+  messagesResizeObserver = null;
   if (copiedTimer) window.clearTimeout(copiedTimer);
 });
 
@@ -290,6 +340,7 @@ watch(
     }
     drawerOpen.value = false;
     enteringIds.value = {};
+    stickToBottom.value = true;
     if (!id) {
       skipNextEnter = false;
       prevMessageIds = [];
@@ -323,12 +374,9 @@ watch(
 watch(
   () => [chat.messages.length, streamText.value],
   async () => {
-    if (restoringOlder) return;
-    if (!stickToBottom.value) return;
+    if (restoringOlder || !stickToBottom.value) return;
     await nextTick();
-    if (messagesEl.value) {
-      messagesEl.value.scrollTop = messagesEl.value.scrollHeight;
-    }
+    pinScrollToBottom();
   },
 );
 
@@ -398,7 +446,9 @@ async function onLoadMore() {
 async function onMessagesScroll() {
   const el = messagesEl.value;
   if (!el) return;
-  stickToBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  if (!suppressStickFromProgrammatic) {
+    syncStickFromUserScroll();
+  }
   if (el.scrollTop > 48 || !chat.hasOlder || chat.loadingOlder || restoringOlder) {
     return;
   }
@@ -413,6 +463,20 @@ async function onMessagesScroll() {
   } finally {
     restoringOlder = false;
   }
+}
+
+/** 上滑离开底部立刻取消贴底；回滚到底部附近则恢复跟滚。 */
+function onMessagesWheel(e: WheelEvent) {
+  const el = messagesEl.value;
+  if (!el) return;
+  if (distanceFromBottom(el) - e.deltaY >= NEAR_BOTTOM_PX) {
+    stickToBottom.value = false;
+  }
+  requestAnimationFrame(syncStickFromUserScroll);
+}
+
+function onMessagesTouchMove() {
+  requestAnimationFrame(syncStickFromUserScroll);
 }
 
 async function onRename(id: string, title: string) {
@@ -450,6 +514,7 @@ function onStop() {
 
 async function onSend() {
   sendError.value = '';
+  stickToBottom.value = true;
   const text = draft.value.trim();
   if (!text || chat.generating) return;
   if (text.length > 8000) {
@@ -485,6 +550,7 @@ async function onSend() {
 
 async function onRetry() {
   if (!conversations.currentId || chat.generating) return;
+  stickToBottom.value = true;
   await chat.retryLastFailed(conversations.currentId);
 }
 
@@ -582,6 +648,9 @@ function onKeydown(e: KeyboardEvent) {
   overflow: auto;
   padding: 24px 32px;
   --empty-icon: rgba(215, 220, 240, 0.82);
+}
+.messages-stack {
+  min-height: min-content;
 }
 .messages :deep(.ant-empty-description) {
   color: var(--color-rail-text);
