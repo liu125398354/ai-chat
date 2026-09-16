@@ -12,7 +12,7 @@
     "prisma:migrate:deploy": "node scripts/run-prisma.cjs migrate deploy",
     "prisma:seed": "node scripts/run-prisma.cjs db seed",
     "lint": "node ../../node_modules/eslint/bin/eslint.js \"src/**/*.ts\"",
-    "test": "node --require ts-node/register/transpile-only --test src/infrastructure/http/client-disconnect.spec.ts src/infrastructure/qianfan/qianfan-stream-abort.spec.ts src/conversation/keyset-cursor.spec.ts src/infrastructure/lock/memory-conversation-lock.spec.ts src/conversation/conversation.service.spec.ts src/conversation/chat-stream.service.spec.ts src/conversation/dto/stream-message.dto.spec.ts src/auth/auth.service.spec.ts src/auth/login-rate-limiter.spec.ts src/config/env.spec.ts"
+    "test": "node --require ts-node/register/transpile-only --test src/infrastructure/http/client-disconnect.spec.ts src/infrastructure/qianfan/qianfan-stream-abort.spec.ts src/infrastructure/qianfan/qianfan-error.spec.ts src/conversation/keyset-cursor.spec.ts src/conversation/chat-context.spec.ts src/infrastructure/lock/memory-conversation-lock.spec.ts src/conversation/conversation.service.spec.ts src/conversation/chat-stream.service.spec.ts src/conversation/dto/stream-message.dto.spec.ts src/auth/auth.service.spec.ts src/auth/login-rate-limiter.spec.ts src/config/env.spec.ts"
   },
   "prisma": {
     "seed": "node ../../node_modules/ts-node/dist/bin.js --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

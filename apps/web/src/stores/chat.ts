@@ -2,7 +2,7 @@
  * @file chat.ts
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-14
+ * @updated 2026-09-16
  * @description 当前会话消息与 generating；停止/切会话 abort 前端 SSE，服务端据此停千帆；generating 时拒绝第二路
  */
 import { defineStore } from 'pinia';
@@ -99,8 +99,13 @@ export const useChatStore = defineStore('chat', () => {
 
   /**
    * 乐观插入后拉 SSE；创建失败不得调用本方法。generating 时直接返回。
+   * reuseLastUser：重试失败回复，不再插一条相同 user。
    */
-  async function send(conversationId: string, content: string) {
+  async function send(
+    conversationId: string,
+    content: string,
+    options: { reuseLastUser?: boolean } = {},
+  ) {
     if (generating.value) {
       error.value = '请等待当前回复完成';
       return;
@@ -108,7 +113,21 @@ export const useChatStore = defineStore('chat', () => {
     generating.value = true;
     streamConversationId.value = conversationId;
     error.value = '';
-    const tempUser: ChatMessage = {
+    const reuseLastUser = Boolean(options.reuseLastUser);
+    if (reuseLastUser) {
+      while (messages.value.length) {
+        const tail = messages.value[messages.value.length - 1];
+        if (tail.role === 'assistant' && tail.status === 'failed') {
+          messages.value = messages.value.slice(0, -1);
+          continue;
+        }
+        break;
+      }
+    }
+    const existingUser = reuseLastUser
+      ? [...messages.value].reverse().find((row) => row.role === 'user')
+      : undefined;
+    const tempUser: ChatMessage = existingUser || {
       id: `temp-user-${Date.now()}`,
       conversationId,
       role: 'user',
@@ -126,7 +145,9 @@ export const useChatStore = defineStore('chat', () => {
       errorCode: null,
       createdAt: new Date().toISOString(),
     };
-    messages.value = [...messages.value, tempUser, tempAsst];
+    messages.value = reuseLastUser
+      ? [...messages.value, tempAsst]
+      : [...messages.value, tempUser, tempAsst];
     abortController = new AbortController();
     const targetId = conversationId;
     try {
@@ -162,9 +183,11 @@ export const useChatStore = defineStore('chat', () => {
       const streamErr = err as StreamError;
       if (streamErr.name === 'AbortError') return;
       if (streamErr.status === 409) {
-        messages.value = messages.value.filter(
-          (row) => row.id !== tempUser.id && row.id !== tempAsst.id,
-        );
+        messages.value = messages.value.filter((row) => {
+          if (row.id === tempAsst.id) return false;
+          if (!reuseLastUser && row.id === tempUser.id) return false;
+          return true;
+        });
         error.value = streamErr.message || '请等待当前回复完成';
         return;
       }
@@ -206,7 +229,7 @@ export const useChatStore = defineStore('chat', () => {
   async function retryLastFailed(conversationId: string) {
     const lastUser = [...messages.value].reverse().find((row) => row.role === 'user');
     if (!lastUser || generating.value) return;
-    await send(conversationId, lastUser.content);
+    await send(conversationId, lastUser.content, { reuseLastUser: true });
   }
 
   return {

@@ -2,7 +2,7 @@
  * @file qianfan.adapter.ts
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-13
+ * @updated 2026-09-16
  * @description 千帆 ChatCompletion 流式适配：只在此使用官方 SDK；支持 AbortSignal 取消上游
  */
 import { Injectable, Logger } from '@nestjs/common';
@@ -108,17 +108,16 @@ export class QianfanAdapter {
         );
         throw clientAbortedError();
       }
+      const mapped = err instanceof QianfanAppError ? err : mapQianfanFailure(err);
       this.logger.warn(
         JSON.stringify({
           op: 'qianfan_stream_failed',
           model: env.qianfanModel,
-          error: err instanceof Error ? err.message : 'unknown',
+          code: mapped.code,
+          error: mapped.message,
         }),
       );
-      if (err instanceof QianfanAppError) {
-        throw err;
-      }
-      throw mapQianfanFailure(err);
+      throw mapped;
     } finally {
       signal?.removeEventListener('abort', onAbort);
       if (signal?.aborted) {

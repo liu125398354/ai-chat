@@ -2,7 +2,7 @@
  * @file chat-stream.service.ts
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-13
+ * @updated 2026-09-16
  * @description 流式编排：锁 → 落 user → 千帆 delta → 落 assistant → done/error；客户端断开则 abort 千帆
  */
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
@@ -59,40 +59,22 @@ export class ChatStreamService {
     let inputChars = 0;
     let outcome: 'done' | 'error' | 'aborted' = 'error';
     try {
-      const userMessage = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.message.create({
-          data: {
-            conversationId,
-            role: 'user',
-            content,
-            status: 'completed',
-          },
-        });
-        const conv = await tx.conversation.findUnique({
-          where: { id: conversationId },
-          select: { title: true },
-        });
-        const nextTitle =
-          conv?.title === DEFAULT_CONVERSATION_TITLE ? titleFromUserContent(content) : undefined;
-        await tx.conversation.update({
-          where: { id: conversationId },
-          data: {
-            updatedAt: new Date(),
-            ...(nextTitle ? { title: nextTitle } : {}),
-          },
-        });
-        return { created, title: nextTitle || conv?.title || DEFAULT_CONVERSATION_TITLE };
-      });
+      const userMessage = await this.persistUserTurn(conversationId, content);
 
       const env = loadAppEnv();
       const history = await this.prisma.message.findMany({
         where: { conversationId },
         orderBy: { createdAt: 'asc' },
-        select: { role: true, content: true },
+        select: { role: true, content: true, status: true },
       });
-      const turns = toQianfanTurns(history, env.contextMaxMessages);
+      const turns = toQianfanTurns(history, env.contextMaxMessages, env.contextMaxChars);
       inputChars = turns.reduce((n, turn) => n + turn.content.length, 0);
-      const contextTruncated = history.length > env.contextMaxMessages;
+      const eligible = history.filter(
+        (row) => row.status !== 'failed' && row.content.trim().length > 0,
+      );
+      const contextTruncated =
+        eligible.length > env.contextMaxMessages ||
+        eligible.reduce((n, row) => n + row.content.length, 0) > env.contextMaxChars;
 
       this.writeSseHeaders(res);
       sseStarted = true;
@@ -229,6 +211,57 @@ export class ChatStreamService {
       disconnect.dispose();
       await this.lock.release(conversationId);
     }
+  }
+
+  /**
+   * 重试失败回复时复用最后一条相同内容的 user，并删掉其后的 failed assistant，
+   * 避免再插一条 user 被拼进上下文触发千帆 336103。
+   */
+  private async persistUserTurn(conversationId: string, content: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const recent = await tx.message.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+      });
+      const failedIds: string[] = [];
+      for (const row of recent) {
+        if (row.role === 'assistant' && row.status === 'failed') {
+          failedIds.push(row.id);
+          continue;
+        }
+        break;
+      }
+      const prevUser = recent[failedIds.length];
+      const conv = await tx.conversation.findUnique({
+        where: { id: conversationId },
+        select: { title: true },
+      });
+      const nextTitle =
+        conv?.title === DEFAULT_CONVERSATION_TITLE ? titleFromUserContent(content) : undefined;
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: {
+          updatedAt: new Date(),
+          ...(nextTitle ? { title: nextTitle } : {}),
+        },
+      });
+      if (prevUser?.role === 'user' && prevUser.content === content) {
+        if (failedIds.length) {
+          await tx.message.deleteMany({ where: { id: { in: failedIds } } });
+        }
+        return { created: prevUser, title: nextTitle || conv?.title || DEFAULT_CONVERSATION_TITLE };
+      }
+      const created = await tx.message.create({
+        data: {
+          conversationId,
+          role: 'user',
+          content,
+          status: 'completed',
+        },
+      });
+      return { created, title: nextTitle || conv?.title || DEFAULT_CONVERSATION_TITLE };
+    });
   }
 
   /** 断开后不再推 SSE；有增量则落 failed，便于回会话后重试。 */

@@ -2,7 +2,7 @@
  * @file env.ts
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-14
+ * @updated 2026-09-16
  * @description 启动期环境变量校验；缺 JWT 或千帆 AK/SK 则拒绝启动
  */
 
@@ -26,6 +26,7 @@ export type AppEnv = {
   qianfanModel: string;
   qianfanTimeoutMs: number;
   contextMaxMessages: number;
+  contextMaxChars: number;
   corsOrigin: string;
   redisUrl: string;
   enableOpenApi: boolean;
@@ -75,6 +76,7 @@ export function loadAppEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
     qianfanModel: (env.QIANFAN_MODEL || 'ernie-4.0-8k').trim(),
     qianfanTimeoutMs: Number(env.QIANFAN_TIMEOUT_MS) || 120000,
     contextMaxMessages: Number(env.CONTEXT_MAX_MESSAGES) || 20,
+    contextMaxChars: Number(env.CONTEXT_MAX_CHARS) || 32_000,
     corsOrigin,
     redisUrl: (env.REDIS_URL || '').trim(),
     enableOpenApi: boolEnv(env.ENABLE_OPENAPI, nodeEnv !== 'production'),

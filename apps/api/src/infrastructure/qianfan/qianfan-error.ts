@@ -2,7 +2,7 @@
  * @file qianfan-error.ts
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-13
+ * @updated 2026-09-16
  * @description 千帆错误映射为产品 QIANFAN_* / CLIENT_ABORTED 码；message 不含 AK/SK
  */
 import { ERROR_CODES } from '@ai-chat/shared';
@@ -46,6 +46,12 @@ export function mapQianfanFailure(err: unknown): QianfanAppError {
       '内容未通过安全审核，请修改后再试',
     );
   }
+  if (isPromptTooLong(text, codeNum)) {
+    return new QianfanAppError(
+      ERROR_CODES.QIANFAN_ERROR,
+      '上下文过长，模型无法处理。请新开对话或缩短近期消息后再试',
+    );
+  }
   const fallback = sanitizeVendorMessage(extractText(err)) || '模型服务暂时不可用';
   return new QianfanAppError(ERROR_CODES.QIANFAN_ERROR, fallback);
 }
@@ -62,10 +68,26 @@ function extractText(err: unknown): string {
 
 function extractErrorCode(err: unknown): number | undefined {
   if (err && typeof err === 'object' && 'error_code' in err) {
-    const value = (err as { error_code: unknown }).error_code;
-    return typeof value === 'number' ? value : Number(value);
+    const n = Number((err as { error_code: unknown }).error_code);
+    if (Number.isFinite(n)) return n;
   }
-  return undefined;
+  const text = extractText(err);
+  const fromJson = parseVendorJson(text);
+  if (fromJson && Number.isFinite(Number(fromJson.error_code))) {
+    return Number(fromJson.error_code);
+  }
+  const match = text.match(/"error_code"\s*:\s*(\d+)/);
+  return match ? Number(match[1]) : undefined;
+}
+
+function parseVendorJson(text: string): { error_code?: unknown; error_msg?: string } | null {
+  const start = text.indexOf('{');
+  if (start < 0) return null;
+  try {
+    return JSON.parse(text.slice(start)) as { error_code?: unknown; error_msg?: string };
+  } catch {
+    return null;
+  }
 }
 
 function isClientAbort(text: string, err: unknown): boolean {
@@ -102,4 +124,11 @@ function isContentFilter(text: string, codeNum?: number): boolean {
     return true;
   }
   return /content.?filter|unsafe|need_clear_history|审核|敏感/.test(text);
+}
+
+function isPromptTooLong(text: string, codeNum?: number): boolean {
+  if (codeNum === 336103) {
+    return true;
+  }
+  return /prompt tokens too long|context length|maximum context|tokens too long/.test(text);
 }
