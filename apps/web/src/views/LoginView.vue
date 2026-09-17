@@ -29,7 +29,7 @@
               placeholder="请输入用户名"
             >
               <template #prefix>
-                <UserOutlined class="affix" />
+                <UserOutlined class="affix" aria-hidden="true" />
               </template>
             </a-input>
           </a-form-item>
@@ -41,7 +41,7 @@
               placeholder="请输入密码"
             >
               <template #prefix>
-                <LockOutlined class="affix" />
+                <LockOutlined class="affix" aria-hidden="true" />
               </template>
             </a-input-password>
           </a-form-item>
@@ -53,15 +53,15 @@
               placeholder="再次输入密码"
             >
               <template #prefix>
-                <LockOutlined class="affix" />
+                <LockOutlined class="affix" aria-hidden="true" />
               </template>
             </a-input-password>
           </a-form-item>
           <a-alert v-if="error" type="error" role="alert" :message="error" show-icon class="err" />
           <a-button type="primary" html-type="submit" block size="large" :loading="submitting">
             <template #icon>
-              <UserAddOutlined v-if="isRegister" />
-              <LoginOutlined v-else />
+              <UserAddOutlined v-if="isRegister" aria-hidden="true" />
+              <LoginOutlined v-else aria-hidden="true" />
             </template>
             {{ isRegister ? '注册并进入' : '登录工作台' }}
           </a-button>
@@ -143,7 +143,7 @@ async function onSubmit() {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/chat';
     await router.replace(redirect);
   } catch (err) {
-    error.value = errorMessage(err, isRegister.value ? '注册失败' : '用户名或密码错误');
+    error.value = isRegister.value ? errorMessage(err, '注册失败') : '用户名或密码错误';
   } finally {
     submitting.value = false;
   }

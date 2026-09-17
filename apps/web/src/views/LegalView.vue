@@ -16,7 +16,7 @@
       </h1>
       <p v-for="(text, index) in page.paragraphs" :key="index">{{ text }}</p>
       <router-link class="back" :to="{ name: 'login' }">
-        <ArrowLeftOutlined />
+        <ArrowLeftOutlined aria-hidden="true" />
         返回登录
       </router-link>
     </article>
@@ -27,7 +27,7 @@
       </h1>
       <p>请从登录页打开用户协议或模型输出免责声明。</p>
       <router-link class="back" :to="{ name: 'login' }">
-        <ArrowLeftOutlined />
+        <ArrowLeftOutlined aria-hidden="true" />
         返回登录
       </router-link>
     </article>

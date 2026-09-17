@@ -67,8 +67,8 @@
 
     <a-layout class="main">
       <a-layout-header v-if="isMobile" class="mobile-bar">
-        <a-button type="text" @click="drawerOpen = true">
-          <MenuOutlined />
+        <a-button type="text" aria-label="打开会话列表" @click="drawerOpen = true">
+          <MenuOutlined aria-hidden="true" />
         </a-button>
         <BrandMark :size="20" />
         <span>AI Chat</span>
@@ -86,7 +86,7 @@
         <div ref="messagesInnerEl" class="messages-stack">
         <div v-if="chat.messages.length" class="thread-bar">
           <button type="button" class="copy-btn" @click="copyThread">
-            <CopyOutlined />
+            <CopyOutlined aria-hidden="true" />
             {{ copiedId === 'thread' ? '已复制会话' : '复制本会话' }}
           </button>
         </div>
@@ -125,13 +125,13 @@
                 show-icon
               />
               <a-button size="small" :disabled="chat.generating" @click="onRetry">
-                <template #icon><ReloadOutlined /></template>
+                <template #icon><ReloadOutlined aria-hidden="true" /></template>
                 重试
               </a-button>
             </div>
           </div>
           <button type="button" class="copy-btn msg-copy" @click="copyMessage(msg)">
-            <CopyOutlined />
+            <CopyOutlined aria-hidden="true" />
             {{ copiedId === msg.id ? '已复制' : '复制' }}
           </button>
         </article>
@@ -178,11 +178,11 @@
               :disabled="chat.generating || !draft.trim()"
               @click="onSend"
             >
-              <template #icon><SendOutlined /></template>
+              <template #icon><SendOutlined aria-hidden="true" /></template>
               发送
             </a-button>
             <a-button v-if="chat.generating" size="large" @click="onStop">
-              <template #icon><PauseOutlined /></template>
+              <template #icon><PauseOutlined aria-hidden="true" /></template>
               停止
             </a-button>
           </div>
@@ -831,6 +831,15 @@ function onKeydown(e: KeyboardEvent) {
 @media (prefers-reduced-motion: reduce) {
   .msg-enter {
     animation: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .messages {
+    padding: 16px;
+  }
+  .composer {
+    padding: 12px 16px 16px;
   }
 }
 </style>

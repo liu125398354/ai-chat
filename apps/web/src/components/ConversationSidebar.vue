@@ -14,12 +14,12 @@
         <strong>会话</strong>
       </div>
       <a-button type="primary" size="small" @click="$emit('new')">
-        <template #icon><PlusOutlined /></template>
+        <template #icon><PlusOutlined aria-hidden="true" /></template>
         新对话
       </a-button>
     </div>
     <div class="search-wrap">
-      <SearchOutlined class="search-ico" />
+      <SearchOutlined class="search-ico" aria-hidden="true" />
       <input
         v-model="searchDraft"
         class="search"
@@ -76,17 +76,23 @@
           :trigger="['click']"
           @openChange="(open: boolean) => onOpenChange(open, item.id)"
         >
-          <button type="button" class="more-btn" title="更多" @click.stop>
-            <MoreOutlined />
+          <button
+            type="button"
+            class="more-btn"
+            title="更多"
+            :aria-label="`更多操作：${item.title}`"
+            @click.stop
+          >
+            <MoreOutlined aria-hidden="true" />
           </button>
           <template #overlay>
             <a-menu @click="onMenuClick($event, item)">
               <a-menu-item key="rename">
-                <EditOutlined />
+                <EditOutlined aria-hidden="true" />
                 重命名
               </a-menu-item>
               <a-menu-item key="delete">
-                <DeleteOutlined />
+                <DeleteOutlined aria-hidden="true" />
                 删除
               </a-menu-item>
             </a-menu>
@@ -103,12 +109,12 @@
       </div>
       <div class="foot-actions">
         <button type="button" class="foot-link" @click="$emit('change-password')">
-          <UnlockOutlined />
+          <UnlockOutlined aria-hidden="true" />
           更换密码
         </button>
         <span class="foot-dot" aria-hidden="true">·</span>
         <button type="button" class="foot-link" @click="$emit('logout')">
-          <LogoutOutlined />
+          <LogoutOutlined aria-hidden="true" />
           离开
         </button>
       </div>
@@ -523,6 +529,12 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
 @media (prefers-reduced-motion: reduce) {
   .active-bar {
     transition: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .conv-list li {
+    height: 44px;
   }
 }
 </style>
