@@ -3,6 +3,7 @@ node_modules/
 
 # Local Cursor rules (not published)
 .cursor/rules/
+.cursor/skills/
 
 # Product docs (keep local)
 docs/
