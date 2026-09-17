@@ -2,8 +2,8 @@
   @file MarkdownView.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-14
-  @description 助手 Markdown：KaTeX 公式 + GitHub 风格 + 代码复制；流式跳过 KaTeX
+  @updated 2026-09-17
+  @description 助手 Markdown：KaTeX 公式 + GitHub 风格 + 代码复制；流式跳过 KaTeX 并在末字后渲染品牌色闪烁光标
 -->
 
 <template>
@@ -150,7 +150,7 @@ async function onBodyClick(event: MouseEvent) {
 .md-body {
   background: transparent !important;
   color: inherit;
-  font-size: 15px;
+  font-size: var(--fs-message);
   line-height: 1.65;
   max-width: none;
 }
@@ -182,39 +182,39 @@ async function onBodyClick(event: MouseEvent) {
 .md-body :deep(.code-block) {
   position: relative;
   margin: 0.8em 0;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: #f6f8fa;
+  background: var(--color-paper);
 }
 .md-body :deep(.code-head) {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 6px 10px;
-  background: #f3f4f6;
-  border-bottom: 1px solid #d0d7de;
-  font-size: 12px;
-  color: #656d76;
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--color-line);
+  font-size: var(--fs-small);
+  color: var(--color-ink-secondary);
 }
 .md-body :deep(.code-copy) {
-  border: 1px solid #d0d7de;
-  border-radius: 6px;
-  background: #fff;
-  color: #1f2328;
-  font-size: 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper-raised);
+  color: var(--color-ink);
+  font-size: var(--fs-small);
   line-height: 1;
   padding: 3px 8px;
   cursor: pointer;
 }
 .md-body :deep(.code-copy:hover) {
-  background: #f6f8fa;
+  background: var(--color-brand-soft);
 }
 .md-body :deep(.code-block pre) {
   margin: 0;
   padding: 12px 14px;
   overflow: auto;
-  background: #f6f8fa;
+  background: var(--color-paper);
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -235,32 +235,33 @@ async function onBodyClick(event: MouseEvent) {
 .md-body :deep(.code-block code.hljs) {
   background: transparent;
   padding: 0;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-secondary);
 }
+/* 流式光标：8px 品牌色块，1s 阶梯闪烁；reduced-motion 下静态常驻 */
 .md-body :deep(.caret) {
   display: inline-block;
-  width: 2px;
-  height: 1.05em;
+  width: 8px;
+  height: 1em;
   margin-left: 2px;
-  background: var(--color-signal);
-  box-shadow: 0 0 8px rgba(126, 224, 255, 0.55);
-  animation: caret-breathe 1.2s ease-in-out infinite;
-  vertical-align: -0.15em;
+  border-radius: 1px;
+  background: var(--color-brand);
+  animation: caret-blink 1s step-end infinite;
+  vertical-align: -0.12em;
 }
-@keyframes caret-breathe {
+@keyframes caret-blink {
   0%,
   100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.25;
+    opacity: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .md-body :deep(.caret) {
     animation: none;
     opacity: 1;
-    box-shadow: none;
   }
 }
 </style>

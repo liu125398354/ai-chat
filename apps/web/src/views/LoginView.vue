@@ -2,7 +2,7 @@
   @file LoginView.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-14
+  @updated 2026-09-17
   @description 登录/注册页：同一套 RSA 加密提交；夜空底与品牌标
 -->
 
@@ -21,7 +21,7 @@
         </h1>
         <p class="sub">{{ isRegister ? '注册后进入对话工作台' : '登录后进入对话工作台' }}</p>
         <a-form layout="vertical" :model="form" :rules="rules" @finish="onSubmit">
-          <a-form-item label="用户名" name="username">
+          <a-form-item label="用户名" name="username" validate-trigger="blur">
             <a-input
               v-model:value="form.username"
               autocomplete="username"
@@ -33,7 +33,7 @@
               </template>
             </a-input>
           </a-form-item>
-          <a-form-item label="密码" name="password">
+          <a-form-item label="密码" name="password" validate-trigger="blur">
             <a-input-password
               v-model:value="form.password"
               :autocomplete="isRegister ? 'new-password' : 'current-password'"
@@ -45,7 +45,7 @@
               </template>
             </a-input-password>
           </a-form-item>
-          <a-form-item v-if="isRegister" label="确认密码" name="confirmPassword">
+          <a-form-item v-if="isRegister" label="确认密码" name="confirmPassword" validate-trigger="blur">
             <a-input-password
               v-model:value="form.confirmPassword"
               autocomplete="new-password"
@@ -57,7 +57,7 @@
               </template>
             </a-input-password>
           </a-form-item>
-          <a-alert v-if="error" type="error" :message="error" show-icon class="err" />
+          <a-alert v-if="error" type="error" role="alert" :message="error" show-icon class="err" />
           <a-button type="primary" html-type="submit" block size="large" :loading="submitting">
             <template #icon>
               <UserAddOutlined v-if="isRegister" />
@@ -217,7 +217,7 @@ onMounted(() => {
 }
 .card {
   background: var(--color-paper-raised);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 16px 40px var(--color-shadow);
 }
 h1 {
@@ -225,7 +225,7 @@ h1 {
   align-items: center;
   gap: 10px;
   margin: 0;
-  font-size: 24px;
+  font-size: var(--fs-card);
   font-weight: 600;
   letter-spacing: 0.12em;
 }
@@ -235,7 +235,7 @@ h1 {
 .sub {
   margin: 8px 0 16px;
   color: var(--color-ink-secondary);
-  font-size: 14px;
+  font-size: var(--fs-body);
 }
 .err {
   margin-bottom: 12px;
@@ -261,7 +261,7 @@ h1 {
   gap: 8px;
   z-index: 1;
   color: var(--color-rail-text);
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 .legal a {
   color: var(--color-rail-text);

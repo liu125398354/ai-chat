@@ -2,7 +2,8 @@
   @file ChangePasswordModal.vue
   @author liunannan
   @date 2026-09-13
-  @description 修改密码弹窗：校验后加密提交
+  @updated 2026-09-17
+  @description 修改密码弹窗：失焦校验后加密提交
 -->
 
 <template>
@@ -17,13 +18,13 @@
     @cancel="onCancel"
   >
     <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
-      <a-form-item label="原密码" name="oldPassword">
+      <a-form-item label="原密码" name="oldPassword" validate-trigger="blur">
         <a-input-password v-model:value="form.oldPassword" autocomplete="current-password" :maxlength="128" />
       </a-form-item>
-      <a-form-item label="新密码" name="newPassword">
+      <a-form-item label="新密码" name="newPassword" validate-trigger="blur">
         <a-input-password v-model:value="form.newPassword" autocomplete="new-password" :maxlength="128" />
       </a-form-item>
-      <a-form-item label="确认新密码" name="confirmPassword">
+      <a-form-item label="确认新密码" name="confirmPassword" validate-trigger="blur">
         <a-input-password v-model:value="form.confirmPassword" autocomplete="new-password" :maxlength="128" />
       </a-form-item>
     </a-form>

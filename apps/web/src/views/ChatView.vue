@@ -2,7 +2,7 @@
   @file ChatView.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-16
+  @updated 2026-09-17
   @description 工作台：夜空底与登录页同系；侧栏半透、气泡/输入条实底保证对比
 -->
 
@@ -76,6 +76,9 @@
       <div
         ref="messagesEl"
         class="messages thin-scroll thin-scroll-dark"
+        role="log"
+        aria-live="polite"
+        :aria-busy="chat.generating"
         @scroll="onMessagesScroll"
         @wheel="onMessagesWheel"
         @touchmove="onMessagesTouchMove"
@@ -115,7 +118,12 @@
               :live="Boolean(chat.generating && lastAssistant && lastAssistant.id === msg.id)"
             />
             <div v-if="msg.status === 'failed'" class="fail-row">
-              <a-alert type="error" :message="chat.error || msg.errorCode || '生成失败'" show-icon />
+              <a-alert
+                type="error"
+                role="alert"
+                :message="chat.error || msg.errorCode || '生成失败'"
+                show-icon
+              />
               <a-button size="small" :disabled="chat.generating" @click="onRetry">
                 <template #icon><ReloadOutlined /></template>
                 重试
@@ -130,11 +138,19 @@
         <a-alert
           v-if="chat.error && lastAssistant?.status !== 'failed'"
           type="error"
+          role="alert"
           :message="chat.error"
           show-icon
           class="alert-gap"
         />
-        <a-alert v-if="sendError" type="error" :message="sendError" show-icon class="alert-gap" />
+        <a-alert
+          v-if="sendError"
+          type="error"
+          role="alert"
+          :message="sendError"
+          show-icon
+          class="alert-gap"
+        />
         </div>
       </div>
       <div class="composer">
@@ -675,14 +691,14 @@ function onKeydown(e: KeyboardEvent) {
   align-items: center;
   gap: 4px;
   border: 1px solid var(--color-line-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--color-paper-raised);
   color: var(--color-ink);
-  font-size: 12px;
+  font-size: var(--fs-small);
   line-height: 1;
   padding: 4px 8px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(12, 14, 28, 0.22);
+  box-shadow: var(--shadow-pop);
 }
 .copy-btn:hover {
   background: var(--color-brand-soft);
@@ -706,7 +722,7 @@ function onKeydown(e: KeyboardEvent) {
   align-items: flex-start;
 }
 .msg-enter {
-  animation: msg-in 180ms var(--ease-tech);
+  animation: msg-in var(--dur-base) var(--ease-tech);
 }
 @keyframes msg-in {
   from {
@@ -723,19 +739,19 @@ function onKeydown(e: KeyboardEvent) {
   width: fit-content;
   max-width: 100%;
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 .msg.user .bubble {
   background: var(--color-brand);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(12, 14, 28, 0.28);
+  box-shadow: var(--shadow-bubble-user);
 }
 .msg.assistant .bubble {
   align-self: flex-start;
   background: var(--color-paper-raised);
   color: var(--color-ink);
   border: 1px solid var(--color-line);
-  box-shadow: 0 4px 16px rgba(12, 14, 28, 0.2);
+  box-shadow: var(--shadow-bubble);
 }
 .msg-copy {
   flex-shrink: 0;
@@ -753,7 +769,7 @@ function onKeydown(e: KeyboardEvent) {
   border-top: 1px solid rgba(213, 220, 236, 0.85);
   background: rgba(251, 252, 255, 0.96);
   flex-shrink: 0;
-  box-shadow: 0 -10px 28px rgba(12, 14, 28, 0.22);
+  box-shadow: var(--shadow-composer);
 }
 .context-hint {
   margin: 0;
@@ -783,11 +799,14 @@ function onKeydown(e: KeyboardEvent) {
   resize: none;
   padding: 10px 12px;
   border: 1px solid var(--color-line-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: #fff;
   color: var(--color-ink);
+  font-size: var(--fs-input);
   outline: none;
-  transition: border-color 160ms var(--ease-tech), box-shadow 160ms var(--ease-tech);
+  transition:
+    border-color var(--dur-fast) var(--ease-tech),
+    box-shadow var(--dur-fast) var(--ease-tech);
 }
 .composer textarea:focus {
   border-color: var(--color-brand);

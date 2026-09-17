@@ -2,7 +2,7 @@
   @file ConversationSidebar.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-14
+  @updated 2026-09-17
   @description 会话列表：搜索、keyset 加载更多、条目多时窗口化渲染
 -->
 
@@ -30,9 +30,9 @@
         @input="onSearchInput"
       />
     </div>
-    <div class="side-body">
+    <div class="side-body" :aria-busy="loading">
       <a-skeleton v-if="loading" active :title="false" :paragraph="{ rows: 6 }" />
-      <a-alert v-else-if="error" type="error" :message="error" show-icon />
+      <a-alert v-else-if="error" type="error" role="alert" :message="error" show-icon />
       <a-empty v-else-if="items.length === 0" :description="query ? '没有匹配的会话' : '还没有会话'">
         <template #image>
           <EmptyFrame />
@@ -331,7 +331,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   padding-top: 8px;
 }
 .side-head strong {
-  font-size: 13px;
+  font-size: var(--fs-secondary);
   font-weight: 600;
   letter-spacing: 0.08em;
 }
@@ -352,7 +352,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   width: 100%;
   padding: 6px 8px 6px 28px;
   border: 1px solid rgba(90, 110, 180, 0.35);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: rgba(12, 14, 28, 0.72);
   color: var(--color-rail-text);
   outline: none;
@@ -374,7 +374,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   padding: 14px 16px 16px;
   border-top: 1px solid rgba(90, 110, 180, 0.28);
   background: rgba(12, 14, 28, 0.72);
-  font-size: 13px;
+  font-size: var(--fs-secondary);
 }
 .side :deep(.ant-empty-description) {
   color: var(--color-rail-text);
@@ -396,7 +396,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
 }
 .user-hint {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: var(--fs-caption);
   letter-spacing: 0.08em;
   color: rgba(215, 220, 240, 0.55);
 }
@@ -416,7 +416,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   border: 0;
   background: transparent;
   color: rgba(215, 220, 240, 0.78);
-  font-size: 12px;
+  font-size: var(--fs-small);
   letter-spacing: 0.04em;
   cursor: pointer;
   padding: 0;
@@ -440,7 +440,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   height: 38px;
   margin-bottom: 6px;
   align-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 .conv-list li.spacer {
   height: auto;
@@ -463,7 +463,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   background: var(--color-brand);
   transform: scaleY(0);
   transform-origin: center;
-  transition: transform 160ms var(--ease-tech);
+  transition: transform var(--dur-fast) var(--ease-tech);
   pointer-events: none;
 }
 .conv-list li.active .active-bar {
@@ -475,7 +475,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   text-align: left;
   padding: 8px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -491,7 +491,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-rail-text);
   font-size: 16px;
@@ -499,7 +499,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms var(--ease-tech);
+  transition: opacity var(--dur-micro) var(--ease-tech);
 }
 .conv-list li:hover:not(.confirming) .more-btn,
 .conv-list li.menu-open .more-btn {
@@ -514,7 +514,7 @@ function onMenuClick({ key }: { key: string | number }, item: Conversation) {
   min-width: 0;
   padding: 6px 8px;
   border: 1px solid var(--color-brand);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: rgba(12, 14, 28, 0.78);
   color: var(--color-rail-text);
   outline: none;

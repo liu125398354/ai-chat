@@ -2,7 +2,7 @@
   @file LegalView.vue
   @author liunannan
   @date 2026-09-14
-  @updated 2026-09-14
+  @updated 2026-09-17
   @description 未登录可访问的用户协议与模型输出免责声明
 -->
 
@@ -86,7 +86,7 @@ const page = computed(() => {
   max-width: calc(100vw - 32px);
   padding: 28px 32px;
   background: var(--color-paper-raised);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 16px 40px var(--color-shadow);
 }
 h1 {
@@ -94,7 +94,7 @@ h1 {
   align-items: center;
   gap: 10px;
   margin: 0 0 16px;
-  font-size: 20px;
+  font-size: var(--fs-title);
   font-weight: 600;
   letter-spacing: 0.08em;
 }
