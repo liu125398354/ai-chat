@@ -2,20 +2,21 @@
   @file MarkdownView.vue
   @author liunannan
   @date 2026-09-13
-  @updated 2026-09-17
-  @description 助手 Markdown：KaTeX 公式 + GitHub 风格 + 代码复制；流式跳过 KaTeX 并在末字后渲染品牌色闪烁光标
+  @updated 2026-10-02
+  @description 助手 Markdown：KaTeX 公式 + GitHub 风格 + 代码复制 + 已闭合 mermaid 图表；流式跳过 KaTeX 并在末字后渲染品牌色闪烁光标
 -->
 
 <template>
   <div class="md-wrap">
-    <div class="md-body markdown-body" v-html="html" @click="onBodyClick" />
+    <div ref="bodyRef" class="md-body markdown-body" v-html="html" @click="onBodyClick" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import DOMPurify from 'dompurify';
 import { markdown as md, markdownLive } from '@/utils/markdown';
+import { closedMermaidBodies } from '@/utils/mermaid-fence';
 import { copyText } from '@/utils/clipboard';
 import 'katex/dist/katex.min.css';
 import 'github-markdown-css/github-markdown-light.css';
@@ -43,6 +44,99 @@ const props = defineProps({
   live: { type: Boolean, default: false },
 });
 const displaySource = ref(props.source);
+const bodyRef = ref<HTMLElement | null>(null);
+const svgCache = new Map<string, string>();
+let paintTicket = 0;
+let mermaidSeq = 0;
+let mermaidApi: typeof import('mermaid').default | null = null;
+
+/** 按需加载 mermaid，避免没有图表的会话把库打进首屏。 */
+async function loadMermaid() {
+  if (!mermaidApi) {
+    const mod = await import('mermaid');
+    mermaidApi = mod.default;
+    mermaidApi.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      htmlLabels: false,
+      suppressErrorRendering: true,
+      logLevel: 'fatal',
+    });
+  }
+  return mermaidApi;
+}
+
+function sanitizeSvg(svg: string) {
+  return DOMPurify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    FORBID_TAGS: ['script', 'foreignObject', 'iframe', 'object', 'embed'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+  });
+}
+
+function markMermaid(block: HTMLElement, state: 'pending' | 'error' | 'ready') {
+  block.classList.toggle('is-pending', state === 'pending');
+  block.classList.toggle('is-error', state === 'error');
+  block.classList.toggle('is-ready', state === 'ready');
+}
+
+/**
+ * 把已闭合的 mermaid 围栏画成 SVG。流式中未闭合的围栏保持源码，避免半截语法反复报错。
+ */
+async function paintDiagrams() {
+  const ticket = ++paintTicket;
+  const root = bodyRef.value;
+  if (!root) return;
+  const blocks = [...root.querySelectorAll<HTMLElement>('.mermaid-block')];
+  if (!blocks.length) return;
+  const closed = new Set(closedMermaidBodies(displaySource.value || ''));
+  const api = await loadMermaid();
+  if (ticket !== paintTicket || !bodyRef.value) return;
+
+  for (const block of blocks) {
+    if (ticket !== paintTicket) return;
+    const raw = block.querySelector('.mermaid-src code')?.textContent ?? '';
+    const view = block.querySelector<HTMLElement>('.mermaid-view');
+    if (!view) continue;
+    const ready = !props.live || closed.has(raw);
+    if (!ready) {
+      markMermaid(block, 'pending');
+      view.replaceChildren();
+      continue;
+    }
+    let svg = svgCache.get(raw);
+    if (!svg) {
+      try {
+        const parsed = await api.parse(raw, { suppressErrors: true });
+        if (ticket !== paintTicket) return;
+        if (!parsed) {
+          markMermaid(block, props.live ? 'pending' : 'error');
+          view.replaceChildren();
+          continue;
+        }
+        const rendered = await api.render(`mmd-${Date.now().toString(36)}-${++mermaidSeq}`, raw);
+        if (ticket !== paintTicket) return;
+        svg = sanitizeSvg(rendered.svg);
+        if (!svg.includes('<svg')) {
+          markMermaid(block, props.live ? 'pending' : 'error');
+          view.replaceChildren();
+          continue;
+        }
+        svgCache.set(raw, svg);
+        if (svgCache.size > 32) {
+          const oldest = svgCache.keys().next().value;
+          if (oldest) svgCache.delete(oldest);
+        }
+      } catch {
+        markMermaid(block, props.live ? 'pending' : 'error');
+        view.replaceChildren();
+        continue;
+      }
+    }
+    view.innerHTML = svg;
+    markMermaid(block, 'ready');
+  }
+}
 let raf = 0;
 let copiedTimer = 0;
 
@@ -69,6 +163,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  paintTicket += 1;
   if (raf) cancelAnimationFrame(raf);
   if (copiedTimer) window.clearTimeout(copiedTimer);
 });
@@ -91,6 +186,7 @@ function lastInlineHost(root: HTMLElement) {
     const last = kids[kids.length - 1];
     if (last.nodeType === Node.TEXT_NODE) return el;
     if (last.nodeType === Node.ELEMENT_NODE) {
+      if ((last as HTMLElement).classList?.contains('mermaid-block')) return el;
       if (VOID_TAGS.has((last as HTMLElement).tagName)) return el;
       node = last;
       continue;
@@ -122,6 +218,14 @@ const html = computed(() => {
   });
   return props.live ? withLiveCaret(sanitized) : sanitized;
 });
+
+onMounted(() => {
+  void paintDiagrams();
+});
+
+watch(html, () => {
+  void paintDiagrams();
+}, { flush: 'post' });
 
 /** 代码块「复制」走事件委托，避免把源码放进属性。 */
 async function onBodyClick(event: MouseEvent) {
@@ -237,6 +341,37 @@ async function onBodyClick(event: MouseEvent) {
   padding: 0;
   font-family: var(--font-mono);
   font-size: var(--fs-secondary);
+}
+.md-body :deep(.mermaid-block) {
+  margin: 0.8em 0;
+  overflow-x: auto;
+}
+.md-body :deep(.mermaid-src) {
+  display: none;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-paper);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-secondary);
+  white-space: pre-wrap;
+}
+.md-body :deep(.mermaid-block.is-pending .mermaid-src),
+.md-body :deep(.mermaid-block.is-error .mermaid-src) {
+  display: block;
+}
+.md-body :deep(.mermaid-view svg) {
+  max-width: 100%;
+  height: auto;
+}
+.md-body :deep(.mermaid-block.is-error .mermaid-view)::before {
+  content: '这张图还不能绘制';
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-ink-secondary);
+  font-size: var(--fs-small);
 }
 /* 流式光标：8px 品牌色块，1s 阶梯闪烁；reduced-motion 下静态常驻 */
 .md-body :deep(.caret) {

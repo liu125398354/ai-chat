@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { markdown, wrapBareMathEnvs, markdownLive } from './markdown';
+import { closedMermaidBodies } from './mermaid-fence';
 
 function render(src: string) {
   return markdown.render(src);
@@ -62,5 +63,36 @@ describe('live markdown', () => {
   it('skips KaTeX while streaming', () => {
     const html = markdownLive.render('指数 $$x^{n+1}$$');
     assert.doesNotMatch(html, /katex/);
+  });
+});
+
+describe('mermaid fence', () => {
+  it('renders a mermaid placeholder and escapes the source', () => {
+    const html = render('说明\n\n```mermaid\nflowchart TD\n  A["<script>alert(1)</script>"] --> B\n```\n');
+    assert.match(html, /class="mermaid-block"/);
+    assert.match(html, /class="mermaid-src"/);
+    assert.match(html, /&lt;script&gt;/);
+    assert.doesNotMatch(html, /<script>/);
+    assert.doesNotMatch(html, /class="code-block"/);
+  });
+
+  it('keeps other fences as code blocks', () => {
+    const html = render('```js\nconst a = 1;\n```');
+    assert.match(html, /class="code-block"/);
+    assert.doesNotMatch(html, /mermaid-block/);
+  });
+
+  it('lists only closed mermaid bodies while a fence is still open', () => {
+    const src = '```mermaid\nflowchart TD\n  A-->B\n```\n\n接着\n\n```mermaid\nflowchart LR\n  A-->';
+    const bodies = closedMermaidBodies(src);
+    assert.deepEqual(bodies, ['flowchart TD\n  A-->B']);
+    const html = render(src);
+    const encoded = html.match(/<code>([\s\S]*?)<\/code>/)?.[1] ?? '';
+    const decoded = encoded
+      .replace(/&gt;/g, '>')
+      .replace(/&lt;/g, '<')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&');
+    assert.equal(decoded, bodies[0]);
   });
 });

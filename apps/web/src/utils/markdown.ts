@@ -2,8 +2,8 @@
  * @file markdown.ts
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-09-14
- * @description 创建带 KaTeX、代码高亮与代码块工具条的 markdown-it 实例
+ * @updated 2026-10-02
+ * @description 创建带 KaTeX、代码高亮、代码块工具条与 mermaid 占位的 markdown-it 实例
  */
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js/lib/core';
@@ -31,6 +31,7 @@ import yaml from 'highlight.js/lib/languages/yaml';
 import type { LanguageFn } from 'highlight.js';
 import type { Token } from 'markdown-it';
 import { markdownItKatex } from './markdown-it-katex';
+import { mermaidFenceBody } from './mermaid-fence';
 
 const HLJS_LANGS: Record<string, LanguageFn> = {
   bash,
@@ -95,12 +96,26 @@ function highlightCode(code: string, lang: string) {
   }
 }
 
-/** 代码围栏外包一层，供点击复制；不高亮失败时回退转义。 */
+/** mermaid 围栏只放转义后的源码，真正绘图在消毒之后进行。 */
+function renderMermaidFence(content: string) {
+  const body = escapeHtml(mermaidFenceBody(content));
+  return (
+    `<div class="mermaid-block">` +
+    `<pre class="mermaid-src"><code>${body}</code></pre>` +
+    `<div class="mermaid-view" role="img" aria-label="Mermaid 图表"></div>` +
+    `</div>\n`
+  );
+}
+
+/** 代码围栏外包一层，供点击复制；mermaid 改为图表占位；不高亮失败时回退转义。 */
 function renderFence(md: MarkdownIt) {
   return (tokens: Token[], idx: number) => {
     const token = tokens[idx];
     const info = token.info ? md.utils.unescapeAll(token.info).trim() : '';
     const lang = info.split(/\s+/g)[0] || '';
+    if (lang.toLowerCase() === 'mermaid') {
+      return renderMermaidFence(token.content);
+    }
     const highlighted = highlightCode(token.content, lang);
     const label = escapeHtml(lang || 'code');
     return (
