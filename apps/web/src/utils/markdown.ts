@@ -2,8 +2,8 @@
  * @file markdown.ts
  * @author liunannan
  * @date 2026-09-13
- * @updated 2026-10-02
- * @description 创建带 KaTeX、代码高亮、代码块工具条与 mermaid 占位的 markdown-it 实例
+ * @updated 2026-10-10
+ * @description 创建带 KaTeX、代码高亮、代码块工具条与 mermaid 图表卡片的 markdown-it 实例
  */
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js/lib/core';
@@ -101,6 +101,7 @@ function renderMermaidFence(content: string) {
   const body = escapeHtml(mermaidFenceBody(content));
   return (
     `<div class="mermaid-block">` +
+    `<div class="mermaid-head"><span class="mermaid-label">图表</span></div>` +
     `<pre class="mermaid-src"><code>${body}</code></pre>` +
     `<div class="mermaid-view" role="img" aria-label="Mermaid 图表"></div>` +
     `</div>\n`

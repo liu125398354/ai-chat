@@ -236,8 +236,8 @@ function markDiagram(block: HTMLElement, state: 'pending' | 'error', view: HTMLE
 function ensureToolbar(block: HTMLElement) {
   if (block.querySelector('.mermaid-toolbar')) return;
   const bar = buildToolbar();
-  const src = block.querySelector('.mermaid-src');
-  if (src) block.insertBefore(bar, src);
+  const head = block.querySelector('.mermaid-head');
+  if (head) head.append(bar);
   else block.prepend(bar);
 }
 
@@ -890,13 +890,32 @@ function onPanEnd(event: PointerEvent) {
   position: relative;
   margin: 0.8em 0;
   max-width: 100%;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-paper);
+}
+.md-body :deep(.mermaid-head) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--color-line);
+  font-size: var(--fs-small);
+  color: var(--color-ink-secondary);
+}
+.md-body :deep(.mermaid-label) {
+  flex-shrink: 0;
 }
 .md-body :deep(.mermaid-toolbar) {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
-  margin-bottom: 8px;
+  justify-content: flex-end;
 }
 .md-body :deep(.mermaid-act),
 .md-body :deep(.mermaid-item) {
@@ -942,13 +961,18 @@ function onPanEnd(event: PointerEvent) {
 .md-body :deep(.mermaid-view) {
   overflow-x: auto;
   max-width: 100%;
+  padding: 12px 14px;
+  background: var(--color-paper);
+}
+.md-body :deep(.mermaid-view:empty) {
+  display: none;
 }
 .md-body :deep(.mermaid-src) {
   display: none;
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-lg);
+  border: 0;
+  border-radius: 0;
   background: var(--color-paper);
   overflow: auto;
   font-family: var(--font-mono);
@@ -962,6 +986,9 @@ function onPanEnd(event: PointerEvent) {
 }
 .md-body :deep(.mermaid-block.is-ready.is-source .mermaid-view) {
   display: none;
+}
+.md-body :deep(.mermaid-block.is-error .mermaid-view) {
+  display: block;
 }
 .md-body :deep(.mermaid-view svg) {
   max-width: 100%;

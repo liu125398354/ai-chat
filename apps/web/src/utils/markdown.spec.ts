@@ -70,6 +70,8 @@ describe('mermaid fence', () => {
   it('renders a mermaid placeholder and escapes the source', () => {
     const html = render('说明\n\n```mermaid\nflowchart TD\n  A["<script>alert(1)</script>"] --> B\n```\n');
     assert.match(html, /class="mermaid-block"/);
+    assert.match(html, /class="mermaid-head"/);
+    assert.match(html, /class="mermaid-label">图表</);
     assert.match(html, /class="mermaid-src"/);
     assert.match(html, /&lt;script&gt;/);
     assert.doesNotMatch(html, /<script>/);
