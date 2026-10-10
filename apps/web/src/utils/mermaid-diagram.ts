@@ -2,6 +2,7 @@
  * @file mermaid-diagram.ts
  * @author liunannan
  * @date 2026-10-10
+ * @updated 2026-10-10
  * @description 已绘制 Mermaid 图的文件名、SVG 尺寸与导出；调用方须传入消毒后的 SVG
  */
 
@@ -54,7 +55,7 @@ export function prepareSvgMarkup(svg: string) {
 
 /**
  * 给灯箱副本换一套 id，避免和气泡里的图争用 url(#id)。
- * 长 id 先替换，避免短 id 截断长 id。
+ * 先改 id / url(#id) / href，再改样式里的 #id；长 id 优先，颜色值不动。
  */
 export function namespaceSvgIds(svg: string, prefix: string) {
   const ids = new Set<string>();
@@ -72,7 +73,39 @@ export function namespaceSvgIds(svg: string, prefix: string) {
     out = out.split(`href='#${id}'`).join(`href='#${next}'`);
     out = out.split(`xlink:href="#${id}"`).join(`xlink:href="#${next}"`);
   }
+  for (const id of ordered) {
+    out = replaceStyleSelector(out, id, `${prefix}${id}`);
+  }
   return out;
+}
+
+/** 只替换样式选择器里的完整 #id。后面仍是 id 字符时跳过，避免改掉 #aaa 这类颜色。 */
+function replaceStyleSelector(text: string, id: string, next: string) {
+  const needle = `#${id}`;
+  const replacement = `#${next}`;
+  let out = '';
+  let from = 0;
+  while (from < text.length) {
+    const at = text.indexOf(needle, from);
+    if (at < 0) {
+      out += text.slice(from);
+      break;
+    }
+    const after = at + needle.length;
+    if (isIdChar(text.charCodeAt(after))) {
+      out += text.slice(from, after);
+      from = after;
+      continue;
+    }
+    out += text.slice(from, at) + replacement;
+    from = after;
+  }
+  return out;
+}
+
+function isIdChar(code: number) {
+  if (Number.isNaN(code)) return false;
+  return (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 45 || code === 95;
 }
 
 /** 触发本机下载。文件名里的斜杠会先换成空格。 */

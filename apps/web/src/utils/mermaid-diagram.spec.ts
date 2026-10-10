@@ -72,4 +72,29 @@ describe('svg markup', () => {
     assert.doesNotMatch(next, /id="ab"/);
     assert.doesNotMatch(next, /id="p-p-/);
   });
+
+  it('rewrites style selectors and keeps color hex', () => {
+    const svg = [
+      '<svg id="diagram">',
+      '<style>#diagram .edge-pattern-dotted{stroke:#28253D}#diagram .edge{marker-end:url(#diagram_pointEnd)}</style>',
+      '<marker id="diagram_pointEnd"></marker>',
+      '<path marker-end="url(#diagram_pointEnd)" />',
+      '</svg>',
+    ].join('');
+    const next = namespaceSvgIds(svg, 'p-');
+    assert.match(next, /id="p-diagram"/);
+    assert.match(next, /#p-diagram \.edge-pattern-dotted\{stroke:#28253D\}/);
+    assert.match(next, /#p-diagram \.edge\{marker-end:url\(#p-diagram_pointEnd\)\}/);
+    assert.match(next, /id="p-diagram_pointEnd"/);
+    assert.doesNotMatch(next, /#diagram[ {_]/);
+    assert.doesNotMatch(next, /url\(#diagram/);
+    assert.doesNotMatch(next, /#p-p-/);
+  });
+
+  it('does not rewrite a color that only starts with a shorter id', () => {
+    const svg = '<svg id="a"><style>#a{fill:#aaa}</style></svg>';
+    const next = namespaceSvgIds(svg, 'p-');
+    assert.match(next, /#p-a\{fill:#aaa\}/);
+    assert.doesNotMatch(next, /#p-aaa/);
+  });
 });
