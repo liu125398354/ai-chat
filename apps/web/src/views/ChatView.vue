@@ -115,6 +115,7 @@
             <MarkdownView
               v-else
               :source="msg.content"
+              :export-title="currentConversationTitle"
               :live="Boolean(chat.generating && lastAssistant && lastAssistant.id === msg.id)"
             />
             <div v-if="msg.status === 'failed'" class="fail-row">
@@ -284,6 +285,12 @@ const emptyWorkbench = computed(
 const lastAssistant = computed(() => {
   const list = chat.messages;
   return list.length ? list[list.length - 1] : null;
+});
+
+const currentConversationTitle = computed(() => {
+  const id = conversations.currentId;
+  if (!id) return '';
+  return conversations.items.find((item) => item.id === id)?.title || '';
 });
 
 const streamText = computed(() => lastAssistant.value?.content || '');
